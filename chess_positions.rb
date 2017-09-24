@@ -51,19 +51,38 @@ class ChessSquare
 	attr_reader(:column)
 	attr_reader(:index)
 	attr_accessor(:piece)
+	attr_accessor(:mirror)
 	attr_reader(:states)
-	attr_accessor(:positions)
+	attr_accessor(:white_positions)
+	attr_accessor(:white_square)
+	attr_accessor(:black_positions)
 
 	def initialize(row, column, index, piece)
 		@row = row
 		@column = column
 		@index = index
 		@piece = piece
+		@mirror = nil
 		@states = [
 			ChessSquareState.new(0),
 			ChessSquareState.new(1)
 		]
-		@positions = 0
+		@white_positions = 0
+		@white_square = nil
+		@black_positions = 0
+	end
+
+	def reflect_white_positions
+		if mirror != self
+			mirror.white_positions = self.white_positions
+		end
+	end
+
+	def reflect_black_positions(white_square)
+		if mirror != self
+			mirror.white_square = white_square
+			mirror.black_positions = self.black_positions
+		end
 	end
 end
 
@@ -151,6 +170,9 @@ class ChessPositions
 				@squares.push(@mem_squares[square_index(row, column)])
 			end
 		end
+		@squares.each do |square|
+			square.mirror = @mem_squares[square_index(square.row, @mem_columns-square.column-1)]
+		end
 		@positions_sum = 0
 		@colors = [
 			ChessColor.new(@pieces["BlackThreat"]),
@@ -174,41 +196,50 @@ class ChessPositions
 		end
 	end
 
+	def square_index(row, column)
+		row*@mem_columns+column
+	end
+
 	def run
 		@positions_sum = 0
 		@squares.each do |white_square|
-			if white_square.positions == 0
+			if white_square.white_positions == 0
 				white_square.piece = @pieces["WhiteKing"]
 				@colors[0].king_square = white_square
 				@squares.each do |black_square|
 					if black_square.piece == @pieces["Undefined"] && !search_threat(black_square, @pieces["WhiteKing"])
-						black_square.piece = @pieces["BlackKing"]
-						@colors[1].king_square = black_square
-						@squares.each do |square|
-							square.states[0].reset
-							square.states[1].reset
+						if white_square.mirror != white_square || black_square.white_square != white_square
+							black_square.piece = @pieces["BlackKing"]
+							@colors[1].king_square = black_square
+							@squares.each do |square|
+								square.states[0].reset
+								square.states[1].reset
+							end
+							set_piece_states(white_square, @pieces["BlackQueen"], 0)
+							set_piece_states(white_square, @pieces["BlackRook"], 0)
+							set_piece_states(white_square, @pieces["BlackBishop"], 0)
+							set_piece_states(white_square, @pieces["BlackKnight"], 0)
+							set_piece_states(white_square, @pieces["BlackPawn"], 0)
+							set_piece_states(black_square, @pieces["WhiteQueen"], 1)
+							set_piece_states(black_square, @pieces["WhiteRook"], 1)
+							set_piece_states(black_square, @pieces["WhiteBishop"], 1)
+							set_piece_states(black_square, @pieces["WhiteKnight"], 1)
+							set_piece_states(black_square, @pieces["WhitePawn"], 1)
+							set_threats
+							count_positions(0, 1)
+							@threats.clear
+							black_square.white_square = white_square
+							black_square.black_positions = @positions*@factor
+							black_square.piece = @pieces["Undefined"]
+							black_square.reflect_black_positions(white_square)
 						end
-						set_piece_states(white_square, @pieces["BlackQueen"], 0)
-						set_piece_states(white_square, @pieces["BlackRook"], 0)
-						set_piece_states(white_square, @pieces["BlackBishop"], 0)
-						set_piece_states(white_square, @pieces["BlackKnight"], 0)
-						set_piece_states(white_square, @pieces["BlackPawn"], 0)
-						set_piece_states(black_square, @pieces["WhiteQueen"], 1)
-						set_piece_states(black_square, @pieces["WhiteRook"], 1)
-						set_piece_states(black_square, @pieces["WhiteBishop"], 1)
-						set_piece_states(black_square, @pieces["WhiteKnight"], 1)
-						set_piece_states(black_square, @pieces["WhitePawn"], 1)
-						set_threats
-						count_positions(0, 1)
-						@threats.clear
-						white_square.positions += @positions*@factor
-						black_square.piece = @pieces["Undefined"]
+						white_square.white_positions += black_square.black_positions
 					end
 				end
 				white_square.piece = @pieces["Undefined"]
-				reflect_positions(white_square)
+				white_square.reflect_white_positions
 			end
-			@positions_sum += white_square.positions
+			@positions_sum += white_square.white_positions
 		end
 	end
 
@@ -285,7 +316,7 @@ class ChessPositions
 	def set_choices(threat_index, positions, square)
 		others = @@others_max
 		square.states.each do |state|
-			if influent_step(state) && state.count > 0 && !@colors[state.index].in_check
+			if potential_check(state)
 				square.piece = @colors[state.index].threat_piece
 				last_step = @colors[state.index].last_steps[state.move_index]
 				if more_influent_step(state)
@@ -305,7 +336,7 @@ class ChessPositions
 			in_checks = []
 			square.states.each do |state|
 				in_checks[state.index] = @colors[state.index].in_check
-				if influent_step(state) && state.count > 0 && !@colors[state.index].in_check
+				if potential_check(state)
 					@colors[state.index].in_check = search_color_threat(@colors[state.index], state.move_index)
 				end
 			end
@@ -331,6 +362,10 @@ class ChessPositions
 		square.piece = @pieces["Undefined"]
 	end
 
+	def potential_check(state)
+		influent_step(state) && state.count > 0 && !@colors[state.index].in_check
+	end
+
 	def influent_step(state)
 		state.step <= @colors[state.index].last_steps[state.move_index]
 	end
@@ -345,14 +380,6 @@ class ChessPositions
 			target_index -= @moves[move_index]
 		end
 		@mem_squares[target_index].piece == color.threat_piece
-	end
-
-	def reflect_positions(square)
-		@mem_squares[square_index(square.row, @mem_columns-square.column-1)].positions = square.positions
-	end
-
-	def square_index(row, column)
-		row*@mem_columns+column
 	end
 
 	def output
