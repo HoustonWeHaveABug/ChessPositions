@@ -53,9 +53,9 @@ class ChessSquare
 	attr_accessor(:piece)
 	attr_accessor(:mirror)
 	attr_reader(:states)
-	attr_accessor(:white_positions)
+	attr_accessor(:positions_sum)
 	attr_accessor(:white_square)
-	attr_accessor(:black_positions)
+	attr_accessor(:positions)
 
 	def initialize(row, column, index, piece)
 		@row = row
@@ -67,21 +67,21 @@ class ChessSquare
 			ChessSquareState.new(0),
 			ChessSquareState.new(1)
 		]
-		@white_positions = 0
+		@positions_sum = 0
 		@white_square = nil
-		@black_positions = 0
+		@positions = 0
 	end
 
-	def reflect_white_positions
+	def reflect_positions_sum
 		if mirror != self
-			mirror.white_positions = self.white_positions
+			mirror.positions_sum = self.positions_sum
 		end
 	end
 
-	def reflect_black_positions(white_square)
+	def reflect_positions(white_square)
 		if mirror != self
 			mirror.white_square = white_square
-			mirror.black_positions = self.black_positions
+			mirror.positions = self.positions
 		end
 	end
 end
@@ -203,7 +203,7 @@ class ChessPositions
 	def run
 		@positions_sum = 0
 		@squares.each do |white_square|
-			if white_square.white_positions == 0
+			if white_square.positions_sum == 0
 				white_square.piece = @pieces["WhiteKing"]
 				@colors[0].king_square = white_square
 				@squares.each do |black_square|
@@ -229,17 +229,19 @@ class ChessPositions
 							count_positions(0, 1)
 							@threats.clear
 							black_square.white_square = white_square
-							black_square.black_positions = @positions*@factor
+							black_square.positions = @positions*@factor
+							output_chessboard
+							puts("#{black_square.positions}")
 							black_square.piece = @pieces["Undefined"]
-							black_square.reflect_black_positions(white_square)
+							black_square.reflect_positions(white_square)
 						end
-						white_square.white_positions += black_square.black_positions
+						white_square.positions_sum += black_square.positions
 					end
 				end
 				white_square.piece = @pieces["Undefined"]
-				white_square.reflect_white_positions
+				white_square.reflect_positions_sum
 			end
-			@positions_sum += white_square.white_positions
+			@positions_sum += white_square.positions_sum
 		end
 	end
 
@@ -382,7 +384,16 @@ class ChessPositions
 		@mem_squares[target_index].piece == color.threat_piece
 	end
 
-	def output
+	def output_chessboard
+		for row in @@mem_offset..@@mem_offset+@rows-1
+			for column in @@mem_offset..@@mem_offset+@columns-1
+				putc(@mem_squares[square_index(row, column)].piece.symbol)
+			end
+			puts
+		end
+	end
+
+	def output_positions_sum
 		puts("Positions #{@positions_sum}")
 	end
 end
@@ -392,4 +403,4 @@ if ARGV.size != 2 || !ARGV[0].is_integer? || !ARGV[1].is_integer? || ARGV[0].to_
 end
 chess_positions = ChessPositions.new(ARGV[0].to_i, ARGV[1].to_i)
 chess_positions.run
-chess_positions.output
+chess_positions.output_positions_sum
