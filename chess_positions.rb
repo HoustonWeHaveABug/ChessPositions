@@ -243,6 +243,7 @@ class ChessPositions
 			end
 			@positions_sum += white_square.positions_sum
 		end
+		output_positions_sum
 	end
 
 	def search_threat(square, threat)
@@ -398,9 +399,8 @@ class ChessPositions
 	end
 end
 
-if ARGV.size != 2 || !ARGV[0].is_integer? || !ARGV[1].is_integer? || ARGV[0].to_i < 1 || ARGV[1].to_i < 1 || ARGV[0].to_i*ARGV[1].to_i < 2
+if ARGV.size != 2 || !ARGV[0].is_integer? || !ARGV[1].is_integer? || ARGV[0].to_i < 2 || ARGV[1].to_i < 1
 	exit false
 end
 chess_positions = ChessPositions.new(ARGV[0].to_i, ARGV[1].to_i)
 chess_positions.run
-chess_positions.output_positions_sum
