@@ -1,4 +1,4 @@
-Size    Time          Legal positions without promotion      Time             Legal positions With promotion
+Size    Time          Legal positions without promotion      Time             Legal positions with promotion
 
 3x3     0.2s                                  462499280      0.2s                                  291037344
 4x3     0.4s                              1205577115560      0.4s                               736638074640
