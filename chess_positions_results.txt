@@ -1,3 +1,6 @@
+Environment: Cygwin on Windows 7 Professional
+CPU: Intel i3-4150 3.50 GHz - One core used
+
 Size    Time          Legal positions without promotion      Time             Legal positions with promotion
 
 3x3     0.2s                                  462499280      0.2s                                  291037344
