@@ -12,9 +12,9 @@ Outside of kings, there may be any number of any kind/color of pieces on the boa
 There is no initial starting position and it is not required that the board positions be obtainable by starting from some designated position and making legal moves.
 
 The program takes 3 arguments on the command line: \<rows\> \<columns\> \<options\>
-\<rows\> must be greater than 1
-\<columns\> must be greater than 0
-\<options\> is the sum of none, some or all of the below flags:
+- \<rows\> must be greater than 1
+- \<columns\> must be greater than 0
+- \<options\> is the sum of none, some or all of the below flags:
 1 = pawns allowed on first row
 2 = pawns allowed on last row (no promotions)
 4 = color on move counts (positions where no kings are in chess will be counted twice)
