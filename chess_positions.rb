@@ -1,6 +1,6 @@
 class String
 	def is_integer?
-		self =~ /(-)?\d+/
+		self.to_i.to_s == self
 	end
 end
 
@@ -84,9 +84,10 @@ end
 class ChessPositions
 	@@mem_offset = 2
 
-	def initialize(rows, columns, promote_pawns)
+	def initialize(rows, columns, options)
 		@rows = rows
 		@columns = columns
+		@options = options
 		@mem_rows = @@mem_offset+@rows+@@mem_offset
 		@mem_columns = @@mem_offset+@columns+@@mem_offset
 		@moves = [
@@ -138,17 +139,18 @@ class ChessPositions
 		for row in 0..@@mem_offset-1
 			set_row(row, @pieces["Outside"], 0)
 		end
-		if promote_pawns
-			set_row(@@mem_offset, @pieces["Undefined"], 10)
-			for row in @@mem_offset+1..@@mem_offset+@rows-2
-				set_row(row, @pieces["Undefined"], 11)
-			end
-			set_row(@@mem_offset+@rows-1, @pieces["Undefined"], 10)
-		else
-			for row in @@mem_offset..@@mem_offset+@rows-1
-				set_row(row, @pieces["Undefined"], 11)
-			end
+		others_max = 9
+		if @options & 1 == 1
+			others_max += 1
 		end
+		if @options & 2 == 2
+			others_max += 1
+		end
+		set_row(@@mem_offset, @pieces["Undefined"], others_max)
+		for row in @@mem_offset+1..@@mem_offset+@rows-2
+			set_row(row, @pieces["Undefined"], 11)
+		end
+		set_row(@@mem_offset+@rows-1, @pieces["Undefined"], others_max)
 		for row in @@mem_offset+@rows..@mem_rows-1
 			set_row(row, @pieces["Outside"], 0)
 		end
@@ -212,36 +214,43 @@ class ChessPositions
 						set_piece_states(white_square, @pieces["BlackRook"], 0)
 						set_piece_states(white_square, @pieces["BlackBishop"], 0)
 						set_piece_states(white_square, @pieces["BlackKnight"], 0)
-						set_piece_states(white_square, @pieces["BlackPawn"], 0)
+						black_pawn_states = @options & 1 == 1 || white_square.row != @@mem_offset+1
+						if black_pawn_states == true
+							set_piece_states(white_square, @pieces["BlackPawn"], 0)
+						end
 						set_piece_states(black_square, @pieces["WhiteQueen"], 1)
 						set_piece_states(black_square, @pieces["WhiteRook"], 1)
 						set_piece_states(black_square, @pieces["WhiteBishop"], 1)
 						set_piece_states(black_square, @pieces["WhiteKnight"], 1)
-						set_piece_states(black_square, @pieces["WhitePawn"], 1)
+						white_pawn_states = @options & 1 == 1 || black_square.row != @@mem_offset+@rows-2
+						if white_pawn_states == true
+							set_piece_states(black_square, @pieces["WhitePawn"], 1)
+						end
 						set_threats
 						count_positions(0, 1)
 						@threats.clear
 						@positions_all[white_square.index][black_square.index] = @positions*@factor
-						white_h_mirror = white_square.h_mirror
-						black_h_mirror = black_square.h_mirror
-						@positions_all[white_h_mirror.index][black_h_mirror.index] = @positions*@factor
-						if black_h_mirror.column < black_square.column
-							white_opposite = white_square.opposite
-							black_opposite = black_square.opposite
-							@positions_all[black_opposite.index][white_opposite.index] = @positions*@factor
-							white_opposite_h_mirror = white_opposite.h_mirror
-							black_opposite_h_mirror = black_opposite.h_mirror
-							@positions_all[black_opposite_h_mirror.index][white_opposite_h_mirror.index] = @positions*@factor
-						else
-							white_v_mirror = white_square.v_mirror
-							black_v_mirror = black_square.v_mirror
-							@positions_all[black_v_mirror.index][white_v_mirror.index] = @positions*@factor
-							white_v_mirror_h_mirror = white_v_mirror.h_mirror
-							black_v_mirror_h_mirror = black_v_mirror.h_mirror
-							@positions_all[black_v_mirror_h_mirror.index][white_v_mirror_h_mirror.index] = @positions*@factor
+						if black_pawn_states == white_pawn_states
+							white_h_mirror = white_square.h_mirror
+							black_h_mirror = black_square.h_mirror
+							@positions_all[white_h_mirror.index][black_h_mirror.index] = @positions*@factor
+							if black_h_mirror.column < black_square.column
+								white_opposite = white_square.opposite
+								black_opposite = black_square.opposite
+								@positions_all[black_opposite.index][white_opposite.index] = @positions*@factor
+								white_opposite_h_mirror = white_opposite.h_mirror
+								black_opposite_h_mirror = black_opposite.h_mirror
+								@positions_all[black_opposite_h_mirror.index][white_opposite_h_mirror.index] = @positions*@factor
+							else
+								white_v_mirror = white_square.v_mirror
+								black_v_mirror = black_square.v_mirror
+								@positions_all[black_v_mirror.index][white_v_mirror.index] = @positions*@factor
+								white_v_mirror_h_mirror = white_v_mirror.h_mirror
+								black_v_mirror_h_mirror = black_v_mirror.h_mirror
+								@positions_all[black_v_mirror_h_mirror.index][white_v_mirror_h_mirror.index] = @positions*@factor
+							end
 						end
 						output_chessboard
-						puts("#{@positions*@factor}")
 						black_square.piece = @pieces["Undefined"]
 					end
 				end
@@ -323,7 +332,7 @@ class ChessPositions
 				set_choices(threat_index, positions, @threats[threat_index])
 			else
 				@positions += positions
-				if !@colors[0].in_check && !@colors[1].in_check
+				if @options & 4 == 4 && !@colors[0].in_check && !@colors[1].in_check
 					@positions += positions
 				end
 			end
@@ -406,15 +415,26 @@ class ChessPositions
 			end
 			puts
 		end
+		puts "#{@positions*@factor}"
+		STDOUT.flush
 	end
 
 	def output_positions_sum
-		puts("Positions #{@positions_sum}")
+		puts "Positions #{@positions_sum}"
+		STDOUT.flush
 	end
 end
 
-if ARGV.size != 3 || !ARGV[0].is_integer? || !ARGV[1].is_integer? || !ARGV[2].is_integer? || ARGV[0].to_i < 2 || ARGV[1].to_i < 1 || ARGV[2].to_i < 0 || ARGV[2].to_i > 1
+if ARGV.size != 3 || !ARGV[0].is_integer? || !ARGV[1].is_integer? || !ARGV[2].is_integer? || ARGV[0].to_i < 2 || ARGV[1].to_i < 1 || ARGV[2].to_i < 0 || ARGV[2].to_i > 7
+	STDERR.puts "Program arguments: <rows> <columns> <options>"
+	STDERR.puts "<rows> must be greater than 1"
+	STDERR.puts "<columns> must be greater than 0"
+	STDERR.puts "<options> is the sum of none, some or all of the below flags:"
+	STDERR.puts "1 = pawns allowed on first row"
+	STDERR.puts "2 = pawns allowed on last row (no promotions)"
+	STDERR.puts "4 = color on move counts (positions where no kings are in chess will be counted twice)"
+	STDERR.flush
 	exit false
 end
-chess_positions = ChessPositions.new(ARGV[0].to_i, ARGV[1].to_i, ARGV[2].to_i == 1)
+chess_positions = ChessPositions.new(ARGV[0].to_i, ARGV[1].to_i, ARGV[2].to_i)
 chess_positions.run
