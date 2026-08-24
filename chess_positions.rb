@@ -56,6 +56,11 @@ class ChessSquare
     @opposite = nil
     @states = [ChessSquareState.new(0), ChessSquareState.new(1)]
   end
+
+  def reset_states
+    @states[0].reset
+    @states[1].reset
+  end
 end
 
 # Chess color setup
@@ -89,24 +94,29 @@ end
 
 def set_side(row, column_a, column_b)
   (column_a..column_b).each do |column|
-    @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), @pieces['Side'], 0)
+    @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), @pieces['#'], 0)
   end
 end
 
 def set_row(row, piece, others_max)
-  set_side(row, 0, MEM_OFFSET - 1)
-  (MEM_OFFSET..MEM_OFFSET + @columns - 1).each do |column|
+  set_side(row, 0, 1)
+  (2..@columns + 1).each do |column|
     @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), piece, others_max)
   end
-  set_side(row, MEM_OFFSET + @columns, @mem_columns - 1)
+  set_side(row, @columns + 2, @mem_columns - 1)
 end
 
 def square_idx(row, column)
   row * @mem_columns + column
 end
 
+def set_king_square(square, piece_idx, color_idx)
+  square.piece = @pieces[piece_idx]
+  @colors[color_idx].king_square = square
+end
+
 def search_threat(square, threat)
-  return true if square.piece != @pieces['Undefined']
+  return true if square.piece != @pieces['?']
 
   return search_threat_repeat(square, threat) if threat.repeat_move
 
@@ -116,7 +126,7 @@ end
 def search_threat_repeat(square, threat)
   threat.moves.each do |move_idx|
     target_idx = square.idx - @moves[move_idx]
-    target_idx -= @moves[move_idx] while @mem_squares[target_idx].piece == @pieces['Undefined']
+    target_idx -= @moves[move_idx] while @mem_squares[target_idx].piece == @pieces['?']
     return true if @mem_squares[target_idx].piece == threat
   end
   false
@@ -129,15 +139,35 @@ def search_threat_unique(square, threat)
   false
 end
 
+def set_w_pieces_states(square, pawn_states)
+  set_piece_states(square, @pieces['q'], 0)
+  set_piece_states(square, @pieces['r'], 0)
+  set_piece_states(square, @pieces['b'], 0)
+  set_piece_states(square, @pieces['n'], 0)
+  set_piece_states(square, @pieces['p'], 0) if pawn_states == true
+end
+
+def set_b_pieces_states(square, pawn_states)
+  set_piece_states(square, @pieces['Q'], 1)
+  set_piece_states(square, @pieces['R'], 1)
+  set_piece_states(square, @pieces['B'], 1)
+  set_piece_states(square, @pieces['N'], 1)
+  set_piece_states(square, @pieces['P'], 1) if pawn_states == true
+end
+
 def set_piece_states(square, piece, state_idx)
-  piece.repeat_move ? set_states_repeat(square, piece, state_idx) : set_states_unique(square, piece, state_idx)
+  if piece.repeat_move
+    set_states_repeat(square, piece, state_idx)
+  else
+    set_states_unique(square, piece, state_idx)
+  end
 end
 
 def set_states_repeat(square, piece, state_idx)
   piece.moves.each do |move_idx|
     target_idx = square.idx - @moves[move_idx]
     step = 1
-    while @mem_squares[target_idx].piece == @pieces['Undefined']
+    while @mem_squares[target_idx].piece == @pieces['?']
       @mem_squares[target_idx].states[state_idx].set(move_idx, step)
       target_idx -= @moves[move_idx]
       step += 1
@@ -148,7 +178,7 @@ end
 def set_states_unique(square, piece, state_idx)
   piece.moves.each do |move_idx|
     target_idx = square.idx - @moves[move_idx]
-    next unless @mem_squares[target_idx].piece == @pieces['Undefined']
+    next unless @mem_squares[target_idx].piece == @pieces['?']
 
     @mem_squares[target_idx].states[state_idx].set(move_idx, 1)
   end
@@ -165,7 +195,7 @@ def set_threats
 end
 
 def push_square_threats(square)
-  return unless square.piece == @pieces['Undefined']
+  return unless square.piece == @pieces['?']
 
   if square.states[0].count.positive? || square.states[1].count.positive?
     update_steps(square)
@@ -199,44 +229,58 @@ def set_choices(threat_idx, positions, square)
   square.states.each do |state|
     next unless potential_check(state)
 
-    square.piece = @colors[state.idx].threat_piece
-    last_step = @colors[state.idx].last_steps[state.move_idx]
-    @colors[state.idx].last_steps[state.move_idx] = state.step if more_influent_step(state)
-    in_check = @colors[state.idx].in_check
-    @colors[state.idx].in_check = search_color_threat(@colors[state.idx], state.move_idx)
-    count_positions(threat_idx + 1, positions * state.count)
-    @colors[state.idx].in_check = in_check
-    @colors[state.idx].last_steps[state.move_idx] = last_step
-    square.piece = @pieces['Undefined']
+    set_choice_threat_piece(threat_idx, positions, square, state)
     others -= state.count
   end
   if more_influent_step(square.states[0]) || more_influent_step(square.states[1])
-    square.piece = @pieces['Empty']
-    in_checks = []
-    square.states.each do |state|
-      in_checks[state.idx] = @colors[state.idx].in_check
-      next unless potential_check(state)
-
-      @colors[state.idx].in_check = search_color_threat(@colors[state.idx], state.move_idx)
-    end
-    count_positions(threat_idx + 1, positions)
-    square.states.each do |state|
-      @colors[state.idx].in_check = in_checks[state.idx]
-    end
-    square.piece = @pieces['Undefined']
+    set_choice_empty(threat_idx, positions, square)
     others -= 1
   end
-  square.piece = @pieces['Others']
+  set_choice_others(threat_idx, positions, square, others)
+end
+
+def set_choice_threat_piece(threat_idx, positions, square, state)
+  square.piece = @colors[state.idx].threat_piece
+  last_step = @colors[state.idx].last_steps[state.move_idx]
+  @colors[state.idx].last_steps[state.move_idx] = state.step if more_influent_step(state)
+  in_check = @colors[state.idx].in_check
+  @colors[state.idx].in_check = search_color_threat(@colors[state.idx], state.move_idx)
+  count_positions(threat_idx + 1, positions * state.count)
+  @colors[state.idx].in_check = in_check
+  @colors[state.idx].last_steps[state.move_idx] = last_step
+  square.piece = @pieces['?']
+end
+
+def set_choice_empty(threat_idx, positions, square)
+  square.piece = @pieces['.']
+  in_checks = []
+  square.states.each do |state|
+    in_checks[state.idx] = @colors[state.idx].in_check
+    next unless potential_check(state)
+
+    @colors[state.idx].in_check = search_color_threat(@colors[state.idx], state.move_idx)
+  end
+  count_positions(threat_idx + 1, positions)
+  square.states.each do |state|
+    @colors[state.idx].in_check = in_checks[state.idx]
+  end
+  square.piece = @pieces['?']
+end
+
+def set_choice_others(threat_idx, positions, square, others)
+  square.piece = @pieces['*']
   last_steps = []
   square.states.each do |state|
     last_steps[state.idx] = @colors[state.idx].last_steps[state.move_idx]
-    @colors[state.idx].last_steps[state.move_idx] = state.step if more_influent_step(state)
+    next unless more_influent_step(state)
+
+    @colors[state.idx].last_steps[state.move_idx] = state.step
   end
   count_positions(threat_idx + 1, positions * others)
   square.states.each do |state|
     @colors[state.idx].last_steps[state.move_idx] = last_steps[state.idx]
   end
-  square.piece = @pieces['Undefined']
+  square.piece = @pieces['?']
 end
 
 def potential_check(state)
@@ -253,13 +297,18 @@ end
 
 def search_color_threat(color, move_idx)
   target_idx = color.king_square.idx - @moves[move_idx]
-  target_idx -= @moves[move_idx] while @mem_squares[target_idx].piece == @pieces['Empty']
+  target_idx -= @moves[move_idx] while @mem_squares[target_idx].piece == @pieces['.']
   @mem_squares[target_idx].piece == color.threat_piece
 end
 
+def set_symmetric_cache(b_square, w_square)
+  @cache[b_square.idx][w_square.idx] = @positions * @factor
+  @cache[b_square.h_mirror.idx][w_square.h_mirror.idx] = @positions * @factor
+end
+
 def output_chessboard
-  (MEM_OFFSET..MEM_OFFSET + @rows - 1).each do |row|
-    (MEM_OFFSET..MEM_OFFSET + @columns - 1).each do |column|
+  (2..@rows + 1).each do |row|
+    (2..@columns + 1).each do |column|
       putc(@mem_squares[square_idx(row, column)].piece.symbol)
     end
     puts
@@ -269,7 +318,13 @@ def output_chessboard
 end
 
 def output_positions_sum
-  puts "Positions #{@positions_sum}"
+  positions_sum = 0
+  @cache.each do |white|
+    white.each do |black|
+      positions_sum += black
+    end
+  end
+  puts "Positions #{positions_sum}"
   $stdout.flush
 end
 
@@ -278,9 +333,8 @@ usage unless ARGV.size == 3 && ARGV[0].integer? && ARGV[1].integer? && ARGV[2].i
 @columns = ARGV[1].to_i
 @options = ARGV[2].to_i
 usage unless @rows > 1 && @columns.positive? && @options >= 0 && @options < 8
-MEM_OFFSET = 2
-@mem_rows = MEM_OFFSET + @rows + MEM_OFFSET
-@mem_columns = MEM_OFFSET + @columns + MEM_OFFSET
+@mem_rows = @rows + 4
+@mem_columns = @columns + 4
 @moves = [
   0,
   -1,
@@ -300,50 +354,44 @@ MEM_OFFSET = 2
   @mem_columns * 2 - 1,
   @mem_columns - 2
 ]
-royal_moves = [1, 2, 3, 4, 5, 6, 7, 8]
-rook_moves = [1, 3, 5, 7]
-bishop_moves = [2, 4, 6, 8]
-knight_moves = [9, 10, 11, 12, 13, 14, 15, 16]
-w_pawn_moves = [2, 4]
-b_pawn_moves = [6, 8]
 @pieces = {
-  'WhiteKing' => ChessPiece.new('K', royal_moves, false),
-  'BlackKing' => ChessPiece.new('k', royal_moves, false),
-  'WhiteQueen' => ChessPiece.new('Q', royal_moves, true),
-  'BlackQueen' => ChessPiece.new('q', royal_moves, true),
-  'WhiteRook' => ChessPiece.new('R', rook_moves, true),
-  'BlackRook' => ChessPiece.new('r', rook_moves, true),
-  'WhiteBishop' => ChessPiece.new('B', bishop_moves, true),
-  'BlackBishop' => ChessPiece.new('b', bishop_moves, true),
-  'WhiteKnight' => ChessPiece.new('N', knight_moves, false),
-  'BlackKnight' => ChessPiece.new('n', knight_moves, false),
-  'WhitePawn' => ChessPiece.new('P', w_pawn_moves, false),
-  'BlackPawn' => ChessPiece.new('p', b_pawn_moves, false),
-  'Side' => ChessPiece.new('#', nil, false),
-  'Undefined' => ChessPiece.new('?', nil, false),
-  'Empty' => ChessPiece.new('.', nil, false),
-  'WhiteThreat' => ChessPiece.new('T', nil, false),
-  'BlackThreat' => ChessPiece.new('t', nil, false),
-  'Others' => ChessPiece.new('*', nil, false)
+  'K' => ChessPiece.new('K', [1, 2, 3, 4, 5, 6, 7, 8], false),
+  'k' => ChessPiece.new('k', [1, 2, 3, 4, 5, 6, 7, 8], false),
+  'Q' => ChessPiece.new('Q', [1, 2, 3, 4, 5, 6, 7, 8], true),
+  'q' => ChessPiece.new('q', [1, 2, 3, 4, 5, 6, 7, 8], true),
+  'R' => ChessPiece.new('R', [1, 3, 5, 7], true),
+  'r' => ChessPiece.new('r', [1, 3, 5, 7], true),
+  'B' => ChessPiece.new('B', [2, 4, 6, 8], true),
+  'b' => ChessPiece.new('b', [2, 4, 6, 8], true),
+  'N' => ChessPiece.new('N', [9, 10, 11, 12, 13, 14, 15, 16], false),
+  'n' => ChessPiece.new('n', [9, 10, 11, 12, 13, 14, 15, 16], false),
+  'P' => ChessPiece.new('P', [2, 4], false),
+  'p' => ChessPiece.new('p', [6, 8], false),
+  '#' => ChessPiece.new('#', nil, false),
+  '?' => ChessPiece.new('?', nil, false),
+  '.' => ChessPiece.new('.', nil, false),
+  'T' => ChessPiece.new('T', nil, false),
+  't' => ChessPiece.new('t', nil, false),
+  '*' => ChessPiece.new('*', nil, false)
 }
 @mem_squares = []
-(0..MEM_OFFSET - 1).each do |row|
-  set_row(row, @pieces['Side'], 0)
+2.times do |row|
+  set_row(row, @pieces['#'], 0)
 end
 others_max = 9
 others_max += 1 if @options & 1 == 1
 others_max += 1 if @options & 2 == 2
-set_row(MEM_OFFSET, @pieces['Undefined'], others_max)
-(MEM_OFFSET + 1..MEM_OFFSET + @rows - 2).each do |row|
-  set_row(row, @pieces['Undefined'], 11)
+set_row(2, @pieces['?'], others_max)
+(3..@rows).each do |row|
+  set_row(row, @pieces['?'], 11)
 end
-set_row(MEM_OFFSET + @rows - 1, @pieces['Undefined'], others_max)
-(MEM_OFFSET + @rows..@mem_rows - 1).each do |row|
-  set_row(row, @pieces['Side'], 0)
+set_row(@rows + 1, @pieces['?'], others_max)
+(@rows + 2..@mem_rows - 1).each do |row|
+  set_row(row, @pieces['#'], 0)
 end
 @squares = []
-(MEM_OFFSET..MEM_OFFSET + @rows - 1).each do |row|
-  (MEM_OFFSET..MEM_OFFSET + @columns - 1).each do |column|
+(2..@rows + 1).each do |row|
+  (2..@columns + 1).each do |column|
     @squares.push(@mem_squares[square_idx(row, column)])
   end
 end
@@ -353,76 +401,39 @@ end
   square.opposite = @mem_squares[square_idx(@mem_rows - square.row - 1, @mem_columns - square.column - 1)]
 end
 @colors = [
-  ChessColor.new(@pieces['BlackThreat']),
-  ChessColor.new(@pieces['WhiteThreat'])
+  ChessColor.new(@pieces['t']),
+  ChessColor.new(@pieces['T'])
 ]
-@threats_size = 0
 @threats = []
-@positions_all = Array.new(@mem_rows * @mem_columns) do
-  Array.new(@mem_rows * @mem_columns) do
-    0
-  end
+@cache = Array.new(@mem_rows * @mem_columns) do
+  Array.new(@mem_rows * @mem_columns, 0)
 end
-@positions = 0
-@factor = 1
-@positions_sum = 0
 @squares.each do |w_square|
-  w_square.piece = @pieces['WhiteKing']
-  @colors[0].king_square = w_square
+  set_king_square(w_square, 'K', 0)
   @squares.each do |b_square|
-    next unless @positions_all[w_square.idx][b_square.idx].zero? && !search_threat(b_square, @pieces['WhiteKing'])
+    next unless @cache[w_square.idx][b_square.idx].zero? && !search_threat(b_square, @pieces['K'])
 
-    b_square.piece = @pieces['BlackKing']
-    @colors[1].king_square = b_square
-    @squares.each do |square|
-      square.states[0].reset
-      square.states[1].reset
-    end
-    set_piece_states(w_square, @pieces['BlackQueen'], 0)
-    set_piece_states(w_square, @pieces['BlackRook'], 0)
-    set_piece_states(w_square, @pieces['BlackBishop'], 0)
-    set_piece_states(w_square, @pieces['BlackKnight'], 0)
-    b_pawn_states = @options & 1 == 1 || w_square.row != MEM_OFFSET + 1
-    set_piece_states(w_square, @pieces['BlackPawn'], 0) if b_pawn_states == true
-    set_piece_states(b_square, @pieces['WhiteQueen'], 1)
-    set_piece_states(b_square, @pieces['WhiteRook'], 1)
-    set_piece_states(b_square, @pieces['WhiteBishop'], 1)
-    set_piece_states(b_square, @pieces['WhiteKnight'], 1)
-    w_pawn_states = @options & 1 == 1 || b_square.row != MEM_OFFSET + @rows - 2
-    set_piece_states(b_square, @pieces['WhitePawn'], 1) if w_pawn_states == true
+    set_king_square(b_square, 'k', 1)
+    @squares.each(&:reset_states)
+    b_pawn_states = @options & 1 == 1 || w_square.row != 3
+    set_w_pieces_states(w_square, b_pawn_states)
+    w_pawn_states = @options & 1 == 1 || b_square.row != @rows
+    set_b_pieces_states(b_square, w_pawn_states)
     set_threats
     count_positions(0, 1)
     @threats.clear
-    @positions_all[w_square.idx][b_square.idx] = @positions * @factor
+    @cache[w_square.idx][b_square.idx] = @positions * @factor
     if b_pawn_states == w_pawn_states
-      w_h_mirror = w_square.h_mirror
-      b_h_mirror = b_square.h_mirror
-      @positions_all[w_h_mirror.idx][b_h_mirror.idx] = @positions * @factor
-      if b_h_mirror.column < b_square.column
-        w_opposite = w_square.opposite
-        b_opposite = b_square.opposite
-        @positions_all[b_opposite.idx][w_opposite.idx] = @positions * @factor
-        w_opposite_h_mirror = w_opposite.h_mirror
-        b_opposite_h_mirror = b_opposite.h_mirror
-        @positions_all[b_opposite_h_mirror.idx][w_opposite_h_mirror.idx] = @positions * @factor
+      @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @positions * @factor
+      if b_square.h_mirror.column < b_square.column
+        set_symmetric_cache(b_square.opposite, w_square.opposite)
       else
-        w_v_mirror = w_square.v_mirror
-        b_v_mirror = b_square.v_mirror
-        @positions_all[b_v_mirror.idx][w_v_mirror.idx] = @positions * @factor
-        w_v_mirror_h_mirror = w_v_mirror.h_mirror
-        b_v_mirror_h_mirror = b_v_mirror.h_mirror
-        @positions_all[b_v_mirror_h_mirror.idx][w_v_mirror_h_mirror.idx] = @positions * @factor
+        set_symmetric_cache(b_square.v_mirror, w_square.v_mirror)
       end
     end
     output_chessboard
-    b_square.piece = @pieces['Undefined']
+    b_square.piece = @pieces['?']
   end
-  w_square.piece = @pieces['Undefined']
-end
-@positions_sum = 0
-@positions_all.each do |white|
-  white.each do |black|
-    @positions_sum += black
-  end
+  w_square.piece = @pieces['?']
 end
 output_positions_sum
