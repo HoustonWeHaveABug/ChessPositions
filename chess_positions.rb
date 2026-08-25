@@ -7,7 +7,7 @@ class String
   end
 end
 
-# Chess piece setup
+# Chess piece management
 class ChessPiece
   attr_reader :symbol, :moves, :repeat_move
 
@@ -38,9 +38,29 @@ class ChessSquareState
     @step = step
     @count += 1
   end
+
+  def update_step_less(colors)
+    colors[@idx].last_steps[@move_idx] = @step unless influent_step(colors)
+  end
+
+  def update_step_more(colors)
+    colors[@idx].last_steps[@move_idx] = @step if more_influent_step(colors)
+  end
+
+  def influent_step(colors)
+    @step <= colors[@idx].last_steps[@move_idx]
+  end
+
+  def more_influent_step(colors)
+    @step < colors[@idx].last_steps[@move_idx]
+  end
+
+  def potential_check(colors)
+    influent_step(colors) && @count.positive? && !colors[@idx].in_check
+  end
 end
 
-# Chess square setup
+# Chess square management
 class ChessSquare
   attr_reader :row, :column, :idx, :others_max, :states
   attr_accessor :piece, :h_mirror, :v_mirror, :opposite
@@ -61,9 +81,13 @@ class ChessSquare
     @states[0].reset
     @states[1].reset
   end
+
+  def more_influent_step(colors)
+    @states[0].more_influent_step(colors) || @states[1].more_influent_step(colors)
+  end
 end
 
-# Chess color setup
+# Chess color management
 class ChessColor
   attr_accessor :threat_piece, :king_square, :last_steps, :in_check
 
@@ -77,6 +101,59 @@ class ChessColor
   def reset
     @last_steps.fill(0)
     @in_check = false
+  end
+end
+
+# Chess threat management
+class ChessThreat
+  attr_accessor :square, :others, :last_steps, :in_checks
+
+  def initialize(square)
+    @square = square
+    @last_steps = []
+    @in_checks = []
+  end
+
+  def save_threat_piece(state, colors)
+    @square.piece = colors[state.idx].threat_piece
+    @last_steps[state.idx] = colors[state.idx].last_steps[state.move_idx]
+    @in_checks[state.idx] = colors[state.idx].in_check
+  end
+
+  def restore_threat_piece(colors, state, piece)
+    colors[state.idx].in_check = @in_checks[state.idx]
+    colors[state.idx].last_steps[state.move_idx] = @last_steps[state.idx]
+    @square.piece = piece
+    @others -= state.count
+  end
+
+  def save_empty(piece, colors)
+    @square.piece = piece
+    @square.states.each do |state|
+      @in_checks[state.idx] = colors[state.idx].in_check
+    end
+  end
+
+  def restore_empty(colors, piece)
+    @square.states.each do |state|
+      colors[state.idx].in_check = @in_checks[state.idx]
+    end
+    @square.piece = piece
+    @others -= 1
+  end
+
+  def save_others(piece, colors)
+    @square.piece = piece
+    @square.states.each do |state|
+      @last_steps[state.idx] = colors[state.idx].last_steps[state.move_idx]
+    end
+  end
+
+  def restore_others(colors, piece)
+    @square.states.each do |state|
+      colors[state.idx].last_steps[state.move_idx] = @last_steps[state.idx]
+    end
+    @square.piece = piece
   end
 end
 
@@ -199,7 +276,7 @@ def push_square_threats(square)
 
   if square.states[0].count.positive? || square.states[1].count.positive?
     update_steps(square)
-    @threats.push(square)
+    @threats.push(ChessThreat.new(square))
   else
     @factor *= square.others_max
   end
@@ -207,9 +284,7 @@ end
 
 def update_steps(square)
   square.states.each do |state|
-    next unless state.step > @colors[state.idx].last_steps[state.move_idx]
-
-    @colors[state.idx].last_steps[state.move_idx] = state.step
+    state.update_step_less(@colors)
   end
 end
 
@@ -224,81 +299,49 @@ def count_positions(threat_idx, positions)
   end
 end
 
-def set_choices(threat_idx, positions, square)
-  others = square.others_max
-  square.states.each do |state|
-    next unless potential_check(state)
-
-    set_choice_threat_piece(threat_idx, positions, square, state)
-    others -= state.count
+def set_choices(threat_idx, positions, threat)
+  threat.others = threat.square.others_max
+  threat.square.states.each do |state|
+    set_choice_threat_piece(threat_idx, positions, threat, state)
   end
-  if more_influent_step(square.states[0]) || more_influent_step(square.states[1])
-    set_choice_empty(threat_idx, positions, square)
-    others -= 1
-  end
-  set_choice_others(threat_idx, positions, square, others)
+  set_choice_empty(threat_idx, positions, threat) if threat.square.more_influent_step(@colors)
+  set_choice_others(threat_idx, positions, threat)
 end
 
-def set_choice_threat_piece(threat_idx, positions, square, state)
-  square.piece = @colors[state.idx].threat_piece
-  last_step = @colors[state.idx].last_steps[state.move_idx]
-  @colors[state.idx].last_steps[state.move_idx] = state.step if more_influent_step(state)
-  in_check = @colors[state.idx].in_check
-  @colors[state.idx].in_check = search_color_threat(@colors[state.idx], state.move_idx)
+def set_choice_threat_piece(threat_idx, positions, threat, state)
+  return unless state.potential_check(@colors)
+
+  threat.save_threat_piece(state, @colors)
+  state.update_step_more(@colors)
+  search_color_threat(@colors[state.idx], state.move_idx)
   count_positions(threat_idx + 1, positions * state.count)
-  @colors[state.idx].in_check = in_check
-  @colors[state.idx].last_steps[state.move_idx] = last_step
-  square.piece = @pieces['?']
+  threat.restore_threat_piece(@colors, state, @pieces['?'])
 end
 
-def set_choice_empty(threat_idx, positions, square)
-  square.piece = @pieces['.']
-  in_checks = []
-  square.states.each do |state|
-    in_checks[state.idx] = @colors[state.idx].in_check
-    next unless potential_check(state)
+def set_choice_empty(threat_idx, positions, threat)
+  threat.save_empty(@pieces['.'], @colors)
+  threat.square.states.each do |state|
+    next unless state.potential_check(@colors)
 
-    @colors[state.idx].in_check = search_color_threat(@colors[state.idx], state.move_idx)
+    search_color_threat(@colors[state.idx], state.move_idx)
   end
   count_positions(threat_idx + 1, positions)
-  square.states.each do |state|
-    @colors[state.idx].in_check = in_checks[state.idx]
+  threat.restore_empty(@colors, @pieces['?'])
+end
+
+def set_choice_others(threat_idx, positions, threat)
+  threat.save_others(@pieces['*'], @colors)
+  threat.square.states.each do |state|
+    state.update_step_more(@colors)
   end
-  square.piece = @pieces['?']
-end
-
-def set_choice_others(threat_idx, positions, square, others)
-  square.piece = @pieces['*']
-  last_steps = []
-  square.states.each do |state|
-    last_steps[state.idx] = @colors[state.idx].last_steps[state.move_idx]
-    next unless more_influent_step(state)
-
-    @colors[state.idx].last_steps[state.move_idx] = state.step
-  end
-  count_positions(threat_idx + 1, positions * others)
-  square.states.each do |state|
-    @colors[state.idx].last_steps[state.move_idx] = last_steps[state.idx]
-  end
-  square.piece = @pieces['?']
-end
-
-def potential_check(state)
-  influent_step(state) && state.count.positive? && !@colors[state.idx].in_check
-end
-
-def influent_step(state)
-  state.step <= @colors[state.idx].last_steps[state.move_idx]
-end
-
-def more_influent_step(state)
-  state.step < @colors[state.idx].last_steps[state.move_idx]
+  count_positions(threat_idx + 1, positions * threat.others)
+  threat.restore_others(@colors, @pieces['?'])
 end
 
 def search_color_threat(color, move_idx)
   target_idx = color.king_square.idx - @moves[move_idx]
   target_idx -= @moves[move_idx] while @mem_squares[target_idx].piece == @pieces['.']
-  @mem_squares[target_idx].piece == color.threat_piece
+  color.in_check = @mem_squares[target_idx].piece == color.threat_piece
 end
 
 def set_symmetric_cache(b_square, w_square)
