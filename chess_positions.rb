@@ -20,7 +20,7 @@ end
 
 # Chess square state management
 class ChessSquareState
-  attr_reader :idx, :move_idx, :step, :count
+  attr_reader :idx, :move_idx, :count
 
   def initialize(idx)
     @idx = idx
@@ -110,7 +110,7 @@ end
 
 # Chess threat management
 class ChessThreat
-  attr_accessor :square, :others, :last_steps, :in_checks
+  attr_accessor :square, :others
 
   def initialize(square)
     @square = square
@@ -173,18 +173,18 @@ def usage
   exit false
 end
 
-def set_side(row, column_a, column_b)
-  (column_a..column_b).each do |column|
-    @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), @pieces['#'], 0)
-  end
-end
-
 def set_row(row, piece, others_max)
   set_side(row, 0, 1)
   (2..@columns + 1).each do |column|
     @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), piece, others_max)
   end
   set_side(row, @columns + 2, @mem_columns - 1)
+end
+
+def set_side(row, column_a, column_b)
+  (column_a..column_b).each do |column|
+    @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), @pieces['#'], 0)
+  end
 end
 
 def square_idx(row, column)
@@ -225,7 +225,7 @@ def set_w_pieces_states(square, pawn_states)
   set_piece_states(square, @pieces['r'], 0)
   set_piece_states(square, @pieces['b'], 0)
   set_piece_states(square, @pieces['n'], 0)
-  set_piece_states(square, @pieces['p'], 0) if pawn_states == true
+  set_piece_states(square, @pieces['p'], 0) if pawn_states
 end
 
 def set_b_pieces_states(square, pawn_states)
@@ -233,7 +233,7 @@ def set_b_pieces_states(square, pawn_states)
   set_piece_states(square, @pieces['R'], 1)
   set_piece_states(square, @pieces['B'], 1)
   set_piece_states(square, @pieces['N'], 1)
-  set_piece_states(square, @pieces['P'], 1) if pawn_states == true
+  set_piece_states(square, @pieces['P'], 1) if pawn_states
 end
 
 def set_piece_states(square, piece, state_idx)
@@ -348,9 +348,14 @@ def search_color_threat(color, move_idx)
   color.in_check = @mem_squares[target_idx].piece == color.threat_piece
 end
 
+def clear_threats
+  @threats.clear
+  @positions *= @factor
+end
+
 def set_symmetric_cache(b_square, w_square)
-  @cache[b_square.idx][w_square.idx] = @positions * @factor
-  @cache[b_square.h_mirror.idx][w_square.h_mirror.idx] = @positions * @factor
+  @cache[b_square.idx][w_square.idx] = @positions
+  @cache[b_square.h_mirror.idx][w_square.h_mirror.idx] = @positions
 end
 
 def output_chessboard
@@ -360,7 +365,7 @@ def output_chessboard
     end
     puts
   end
-  puts @positions * @factor
+  puts @positions
   $stdout.flush
 end
 
@@ -468,10 +473,10 @@ end
     set_b_pieces_states(b_square, w_pawn_states)
     set_threats
     count_positions(0, 1)
-    @threats.clear
-    @cache[w_square.idx][b_square.idx] = @positions * @factor
+    clear_threats
+    @cache[w_square.idx][b_square.idx] = @positions
     if b_pawn_states == w_pawn_states
-      @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @positions * @factor
+      @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @positions
       if b_square.h_mirror.column < b_square.column
         set_symmetric_cache(b_square.opposite, w_square.opposite)
       else
