@@ -85,6 +85,10 @@ class ChessSquare
   def more_influent_step(colors)
     @states[0].more_influent_step(colors) || @states[1].more_influent_step(colors)
   end
+
+  def output
+    putc(@piece.symbol)
+  end
 end
 
 # Chess color management
@@ -352,7 +356,7 @@ end
 def output_chessboard
   (2..@rows + 1).each do |row|
     (2..@columns + 1).each do |column|
-      putc(@mem_squares[square_idx(row, column)].piece.symbol)
+      @mem_squares[square_idx(row, column)].output
     end
     puts
   end
