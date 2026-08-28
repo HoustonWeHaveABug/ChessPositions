@@ -93,13 +93,17 @@ end
 
 # Chess color management
 class ChessColor
-  attr_accessor :threat_piece, :king_square, :last_steps, :in_check
+  attr_reader :pieces, :pawn, :threat_piece
+  attr_accessor :king_square, :pawn_states, :last_steps, :in_check
 
-  def initialize(threat_piece)
+  def initialize(pieces, pawn, threat_piece)
+    @pieces = pieces
+    @pawn = pawn
     @threat_piece = threat_piece
     @king_square = nil
+    @pawn_states = nil
     @last_steps = Array.new(17)
-    @in_check = false
+    @in_check = nil
   end
 
   def reset
@@ -110,7 +114,8 @@ end
 
 # Chess threat management
 class ChessThreat
-  attr_accessor :square, :others
+  attr_reader :square
+  attr_accessor :others
 
   def initialize(square)
     @square = square
@@ -220,20 +225,12 @@ def search_threat_unique(square, threat)
   false
 end
 
-def set_w_pieces_states(square, pawn_states)
-  set_piece_states(square, @pieces['q'], 0)
-  set_piece_states(square, @pieces['r'], 0)
-  set_piece_states(square, @pieces['b'], 0)
-  set_piece_states(square, @pieces['n'], 0)
-  set_piece_states(square, @pieces['p'], 0) if pawn_states
-end
-
-def set_b_pieces_states(square, pawn_states)
-  set_piece_states(square, @pieces['Q'], 1)
-  set_piece_states(square, @pieces['R'], 1)
-  set_piece_states(square, @pieces['B'], 1)
-  set_piece_states(square, @pieces['N'], 1)
-  set_piece_states(square, @pieces['P'], 1) if pawn_states
+def set_pieces_states(square, state_idx, row)
+  @colors[state_idx].pieces.each do |piece|
+    set_piece_states(square, @pieces[piece], state_idx)
+  end
+  @colors[state_idx].pawn_states = @options & 1 == 1 || square.row != row
+  set_piece_states(square, @colors[state_idx].pawn, state_idx) if @colors[state_idx].pawn_states
 end
 
 def set_piece_states(square, piece, state_idx)
@@ -270,14 +267,12 @@ def set_threats
   @positions = 0
   @factor = 1
   @squares.each do |square|
-    push_square_threats(square)
+    push_square_threats(square) if square.piece == @pieces['?']
   end
   @threats_size = @threats.size
 end
 
 def push_square_threats(square)
-  return unless square.piece == @pieces['?']
-
   if square.states[0].count.positive? || square.states[1].count.positive?
     update_steps(square)
     @threats.push(ChessThreat.new(square))
@@ -306,15 +301,13 @@ end
 def set_choices(threat_idx, positions, threat)
   threat.others = threat.square.others_max
   threat.square.states.each do |state|
-    set_choice_threat_piece(threat_idx, positions, threat, state)
+    set_choice_threat_piece(threat_idx, positions, threat, state) if state.potential_check(@colors)
   end
   set_choice_empty(threat_idx, positions, threat) if threat.square.more_influent_step(@colors)
   set_choice_others(threat_idx, positions, threat)
 end
 
 def set_choice_threat_piece(threat_idx, positions, threat, state)
-  return unless state.potential_check(@colors)
-
   threat.save_threat_piece(state, @colors)
   state.update_step_more(@colors)
   search_color_threat(@colors[state.idx], state.move_idx)
@@ -353,9 +346,9 @@ def clear_threats
   @positions *= @factor
 end
 
-def set_symmetric_cache(b_square, w_square)
-  @cache[b_square.idx][w_square.idx] = @positions
-  @cache[b_square.h_mirror.idx][w_square.h_mirror.idx] = @positions
+def set_cache(w_square, b_square)
+  @cache[w_square.idx][b_square.idx] = @positions
+  @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @positions
 end
 
 def output_chessboard
@@ -453,8 +446,8 @@ end
   square.opposite = @mem_squares[square_idx(@mem_rows - square.row - 1, @mem_columns - square.column - 1)]
 end
 @colors = [
-  ChessColor.new(@pieces['t']),
-  ChessColor.new(@pieces['T'])
+  ChessColor.new(%w[Q R B N], @pieces['P'], @pieces['t']),
+  ChessColor.new(%w[q r b n], @pieces['p'], @pieces['T'])
 ]
 @threats = []
 @cache = Array.new(@mem_rows * @mem_columns) do
@@ -463,24 +456,21 @@ end
 @squares.each do |w_square|
   set_king_square(w_square, 'K', 0)
   @squares.each do |b_square|
-    next unless @cache[w_square.idx][b_square.idx].zero? && !search_threat(b_square, @pieces['K'])
+    next if @cache[w_square.idx][b_square.idx].positive? || search_threat(b_square, @pieces['K'])
 
     set_king_square(b_square, 'k', 1)
     @squares.each(&:reset_states)
-    b_pawn_states = @options & 1 == 1 || w_square.row != 3
-    set_w_pieces_states(w_square, b_pawn_states)
-    w_pawn_states = @options & 1 == 1 || b_square.row != @rows
-    set_b_pieces_states(b_square, w_pawn_states)
+    set_pieces_states(w_square, 0, 3)
+    set_pieces_states(b_square, 1, @rows)
     set_threats
     count_positions(0, 1)
     clear_threats
-    @cache[w_square.idx][b_square.idx] = @positions
-    if b_pawn_states == w_pawn_states
-      @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @positions
+    set_cache(w_square, b_square)
+    if @colors[0].pawn_states == @colors[1].pawn_states
       if b_square.h_mirror.column < b_square.column
-        set_symmetric_cache(b_square.opposite, w_square.opposite)
+        set_cache(b_square.opposite, w_square.opposite)
       else
-        set_symmetric_cache(b_square.v_mirror, w_square.v_mirror)
+        set_cache(b_square.v_mirror, w_square.v_mirror)
       end
     end
     output_chessboard
