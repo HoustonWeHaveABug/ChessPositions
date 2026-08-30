@@ -40,23 +40,23 @@ class ChessSquareState
   end
 
   def update_step_less(colors)
-    colors[@idx].last_steps[@move_idx] = @step unless influent_step(colors)
+    colors[@idx].last_steps[@move_idx] = @step unless influent_step?(colors)
   end
 
   def update_step_more(colors)
-    colors[@idx].last_steps[@move_idx] = @step if more_influent_step(colors)
+    colors[@idx].last_steps[@move_idx] = @step if more_influent_step?(colors)
   end
 
-  def influent_step(colors)
+  def influent_step?(colors)
     @step <= colors[@idx].last_steps[@move_idx]
   end
 
-  def more_influent_step(colors)
+  def more_influent_step?(colors)
     @step < colors[@idx].last_steps[@move_idx]
   end
 
-  def potential_check(colors)
-    influent_step(colors) && @count.positive? && !colors[@idx].in_check
+  def potential_check?(colors)
+    influent_step?(colors) && @count.positive? && !colors[@idx].in_check
   end
 end
 
@@ -82,8 +82,8 @@ class ChessSquare
     @states[1].reset
   end
 
-  def more_influent_step(colors)
-    @states[0].more_influent_step(colors) || @states[1].more_influent_step(colors)
+  def more_influent_step?(colors)
+    @states[0].more_influent_step?(colors) || @states[1].more_influent_step?(colors)
   end
 
   def output
@@ -301,9 +301,9 @@ end
 def set_choices(threat_idx, positions, threat)
   threat.others = threat.square.others_max
   threat.square.states.each do |state|
-    set_choice_threat_piece(threat_idx, positions, threat, state) if state.potential_check(@colors)
+    set_choice_threat_piece(threat_idx, positions, threat, state) if state.potential_check?(@colors)
   end
-  set_choice_empty(threat_idx, positions, threat) if threat.square.more_influent_step(@colors)
+  set_choice_empty(threat_idx, positions, threat) if threat.square.more_influent_step?(@colors)
   set_choice_others(threat_idx, positions, threat)
 end
 
@@ -318,7 +318,7 @@ end
 def set_choice_empty(threat_idx, positions, threat)
   threat.save_empty(@pieces['.'], @colors)
   threat.square.states.each do |state|
-    next unless state.potential_check(@colors)
+    next unless state.potential_check?(@colors)
 
     search_color_threat(@colors[state.idx], state.move_idx)
   end
