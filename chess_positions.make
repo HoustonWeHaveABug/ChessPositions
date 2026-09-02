@@ -2,7 +2,7 @@ CHESS_POSITIONS_C_FLAGS=-c -fPIE -fsanitize=bounds -fsanitize-undefined-trap-on-
 CHESS_POSITIONS_OBJS=chess_positions.o
 
 chess_positions: ${CHESS_POSITIONS_OBJS}
-	gcc -o chess_positions ${CHESS_POSITIONS_OBJS}
+	gcc -o chess_positions ${CHESS_POSITIONS_OBJS} -lgmp
 
 chess_positions.o: chess_positions.c chess_positions.make
 	gcc ${CHESS_POSITIONS_C_FLAGS} -o chess_positions.o chess_positions.c
