@@ -276,6 +276,7 @@ int main(int argc, char *argv[]) {
 			mpz_add(positions_sum, positions_sum, cache[i][j]);
 		}
 	}
+	printf("Positions ");
 	output_result(positions_sum);
 	free_data(mem_squares_n);
 	return EXIT_SUCCESS;
@@ -430,7 +431,7 @@ static void set_king_square(square_t *square, piece_t *piece, color_t *color) {
 static int search_white_king(square_t *square) {
 	int i;
 	for (i = 0; i < all_pieces[BLACK_KING].moves_n; ++i) {
-		if (mem_squares[square->idx-all_moves[all_pieces->moves[i]]].piece == all_pieces) {
+		if (mem_squares[square->idx-all_moves[all_pieces[BLACK_KING].moves[i]]].piece == all_pieces) {
 			return 1;
 		}
 	}

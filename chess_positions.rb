@@ -90,11 +90,11 @@ end
 
 # Chess color management
 class ChessColor
-  attr_reader :pieces, :pawn, :threat_piece
+  attr_reader :officers, :pawn, :threat_piece
   attr_accessor :king_square, :pawn_states, :last_steps, :in_check
 
-  def initialize(pieces, pawn, threat_piece)
-    @pieces = pieces
+  def initialize(officers, pawn, threat_piece)
+    @officers = officers
     @pawn = pawn
     @threat_piece = threat_piece
     @last_steps = Array.new(17)
@@ -217,7 +217,7 @@ def search_white_king(square)
 end
 
 def set_color_states(square, state_idx, row)
-  @colors[state_idx].pieces.each do |piece|
+  @colors[state_idx].officers.each do |piece|
     set_piece_states(square, @pieces[piece], state_idx)
   end
   @colors[state_idx].pawn_states = @options & 1 == 1 || square.row != row
@@ -255,7 +255,7 @@ end
 
 def set_threats
   @colors.each(&:reset)
-  @positions = 0
+  @all_positions = 0
   @factor = 1
   @squares.each do |square|
     check_square_threats(square) if square.piece == @pieces['?']
@@ -286,8 +286,8 @@ def search_positions(threat_idx, positions)
   if threat_idx < @threats_size
     choose_pieces(threat_idx, positions, @threats[threat_idx])
   else
-    @positions += positions
-    @positions += positions if @options & 4 == 4 && !@colors[0].in_check && !@colors[1].in_check
+    @all_positions += positions
+    @all_positions += positions if @options & 4 == 4 && !@colors[0].in_check && !@colors[1].in_check
   end
 end
 
@@ -336,12 +336,12 @@ end
 
 def clear_threats
   @threats.clear
-  @positions *= @factor
+  @all_positions *= @factor
 end
 
 def set_cache(w_square, b_square)
-  @cache[w_square.idx][b_square.idx] = @positions
-  @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @positions
+  @cache[w_square.idx][b_square.idx] = @all_positions
+  @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @all_positions
 end
 
 def output_chessboard
@@ -351,7 +351,7 @@ def output_chessboard
     end
     puts
   end
-  puts @positions
+  puts @all_positions
   $stdout.flush
 end
 
