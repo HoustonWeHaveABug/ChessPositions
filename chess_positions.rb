@@ -108,25 +108,38 @@ end
 
 # Chess threat management
 class ChessThreat
-  attr_reader :square, :min, :max
+  attr_reader :square, :step_min, :step_max, :move_idx_min, :move_idx_max
   attr_accessor :others
 
   def initialize(square)
     @square = square
-    set_min_max(@square.states[0].step, @square.states[1].step)
+    @square = square
+    set_step_min_max(@square.states[0].step, @square.states[1].step)
+    set_move_idx_min_max(@square.states[0].move_idx, @square.states[1].move_idx)
     @last_steps = []
     @in_checks = []
   end
 
-  def set_min_max(w_step, b_step)
+  def set_step_min_max(w_step, b_step)
     if w_step < b_step
-      @min = w_step
-      @max = b_step
+      @step_min = w_step
+      @step_max = b_step
     else
-      @min = b_step
-      @max = w_step
+      @step_min = b_step
+      @step_max = w_step
     end
-    @min = 1 if @min.zero?
+    @step_min = @step_max if @step_min.zero?
+  end
+
+  def set_move_idx_min_max(w_move_idx, b_move_idx)
+    if w_move_idx < b_move_idx
+      @move_idx_min = w_move_idx
+      @move_idx_max = b_move_idx
+    else
+      @move_idx_min = b_move_idx
+      @move_idx_max = w_move_idx
+    end
+    @move_idx_min = @move_idx_max if @move_idx_min.zero?
   end
 
   def save_threat_piece(state, colors)
@@ -207,7 +220,7 @@ def set_king_square(square, piece_idx, color_idx)
   @colors[color_idx].king_square = square
 end
 
-def search_white_king(square)
+def search_w_king(square)
   return true if square.piece != @pieces['?']
 
   @pieces['k'].moves.each do |move_idx|
@@ -260,9 +273,6 @@ def set_threats
   @squares.each do |square|
     check_square_threats(square) if square.piece == @pieces['?']
   end
-  @threats.sort! do |a, b|
-    a.min != b.min ? a.min <=> b.min : a.max <=> b.max
-  end
 end
 
 def check_square_threats(square)
@@ -277,6 +287,20 @@ end
 def update_steps(square)
   square.states.each do |state|
     state.update_step_less(@colors)
+  end
+end
+
+def sort_threats
+  @threats.sort! do |a, b|
+    if a.step_min != b.step_min
+      a.step_min <=> b.step_min
+    elsif a.step_max != b.step_max
+      a.step_max <=> b.step_max
+    elsif a.move_idx_min != b.move_idx_min
+      a.move_idx_min <=> b.move_idx_min
+    else
+      a.move_idx_max <=> b.move_idx_max
+    end
   end
 end
 
@@ -449,13 +473,14 @@ end
 @squares.each do |w_square|
   set_king_square(w_square, 'K', 0)
   @squares.each do |b_square|
-    next if @cache[w_square.idx][b_square.idx].positive? || search_white_king(b_square)
+    next if @cache[w_square.idx][b_square.idx].positive? || search_w_king(b_square)
 
     set_king_square(b_square, 'k', 1)
     @squares.each(&:reset_states)
     set_color_states(w_square, 0, 3)
     set_color_states(b_square, 1, @rows)
     set_threats
+    sort_threats
     @threats_size = @threats.size
     search_positions(0, 1)
     clear_threats

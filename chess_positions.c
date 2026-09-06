@@ -12,25 +12,25 @@
 #define OFFICERS_N 4
 #define OTHERS_MAX 9UL
 #define PIECES_N 18
-#define BLACK_KING 1
-#define WHITE_QUEEN 2
-#define BLACK_QUEEN 3
-#define WHITE_ROOK 4
-#define BLACK_ROOK 5
-#define WHITE_BISHOP 6
-#define BLACK_BISHOP 7
-#define WHITE_KNIGHT 8
-#define BLACK_KNIGHT 9
-#define WHITE_PAWN 10
-#define BLACK_PAWN 11
+#define B_KING 1
+#define W_QUEEN 2
+#define B_QUEEN 3
+#define W_ROOK 4
+#define B_ROOK 5
+#define W_BISHOP 6
+#define B_BISHOP 7
+#define W_KNIGHT 8
+#define B_KNIGHT 9
+#define W_PAWN 10
+#define B_PAWN 11
 #define PIECE_OUTSIDE 12
 #define PIECE_UNDEFINED 13
 #define PIECE_EMPTY 14
-#define WHITE_THREAT 15
-#define BLACK_THREAT 16
+#define W_THREAT 15
+#define B_THREAT 16
 #define PIECE_OTHERS 17
-#define COLOR_WHITE 0
-#define COLOR_BLACK 1
+#define COLOR_W 0
+#define COLOR_B 1
 #define COLORS_N 2
 #define PAWNS_FIRST_ROW 1
 #define PAWNS_LAST_ROW 2
@@ -81,8 +81,10 @@ color_t;
 
 typedef struct {
 	square_t *square;
-	int min;
-	int max;
+	int step_min;
+	int step_max;
+	int move_idx_min;
+	int move_idx_max;
 	int last_steps[COLORS_N];
 	int in_checks[COLORS_N];
 	unsigned long others;
@@ -110,7 +112,7 @@ static void reset_color(color_t *);
 static void set_threat(threat_t *, square_t *);
 static int compare_threats(const void *, const void *);
 static void set_king_square(square_t *, piece_t *, color_t *);
-static int search_white_king(square_t *);
+static int search_w_king(square_t *);
 static void count_positions(square_t *, square_t *);
 static void set_color_states(square_t *, int, int);
 static void set_piece_states(piece_t *, square_t *, int);
@@ -130,7 +132,7 @@ static threat_t *threats;
 static mpz_t **cache, all_positions, factor;
 
 int main(int argc, char *argv[]) {
-	int mem_rows_n, royal_moves[ROYAL_MOVES_N] = { 1, 2, 3, 4, 5, 6, 7, 8 }, rook_moves[ROOK_MOVES_N] = { 1, 3, 5, 7 }, bishop_moves[BISHOP_MOVES_N] = { 2, 4, 6, 8 }, knight_moves[KNIGHT_MOVES_N] = { 9, 10, 11, 12, 13, 14, 15, 16 }, white_pawn_moves[PAWN_MOVES_N] = { 2, 4 }, black_pawn_moves[PAWN_MOVES_N] = { 6, 8 }, white_pieces[OFFICERS_N] = { WHITE_QUEEN, WHITE_ROOK, WHITE_BISHOP, WHITE_KNIGHT }, black_pieces[OFFICERS_N] = { BLACK_QUEEN, BLACK_ROOK, BLACK_BISHOP, BLACK_KNIGHT }, i;
+	int mem_rows_n, royal_moves[ROYAL_MOVES_N] = { 1, 2, 3, 4, 5, 6, 7, 8 }, rook_moves[ROOK_MOVES_N] = { 1, 3, 5, 7 }, bishop_moves[BISHOP_MOVES_N] = { 2, 4, 6, 8 }, knight_moves[KNIGHT_MOVES_N] = { 9, 10, 11, 12, 13, 14, 15, 16 }, w_pawn_moves[PAWN_MOVES_N] = { 2, 4 }, b_pawn_moves[PAWN_MOVES_N] = { 6, 8 }, w_pieces[OFFICERS_N] = { W_QUEEN, W_ROOK, W_BISHOP, W_KNIGHT }, b_pieces[OFFICERS_N] = { B_QUEEN, B_ROOK, B_BISHOP, B_KNIGHT }, i;
 	unsigned long others_max;
 	mpz_t positions_sum;
 	if (argc != 4) {
@@ -164,22 +166,22 @@ int main(int argc, char *argv[]) {
 	all_moves[15] = mem_columns_n*2-1;
 	all_moves[16] = mem_columns_n-2;
 	set_piece(all_pieces, 'K', ROYAL_MOVES_N, royal_moves, 0);
-	set_piece(all_pieces+BLACK_KING, 'k', ROYAL_MOVES_N, royal_moves, 0);
-	set_piece(all_pieces+WHITE_QUEEN, 'Q', ROYAL_MOVES_N, royal_moves, 1);
-	set_piece(all_pieces+BLACK_QUEEN, 'q', ROYAL_MOVES_N, royal_moves, 1);
-	set_piece(all_pieces+WHITE_ROOK, 'R', ROOK_MOVES_N, rook_moves, 1);
-	set_piece(all_pieces+BLACK_ROOK, 'r', ROOK_MOVES_N, rook_moves, 1);
-	set_piece(all_pieces+WHITE_BISHOP, 'B', BISHOP_MOVES_N, bishop_moves, 1);
-	set_piece(all_pieces+BLACK_BISHOP, 'b', BISHOP_MOVES_N, bishop_moves, 1);
-	set_piece(all_pieces+WHITE_KNIGHT, 'N', KNIGHT_MOVES_N, knight_moves, 0);
-	set_piece(all_pieces+BLACK_KNIGHT, 'n', KNIGHT_MOVES_N, knight_moves, 0);
-	set_piece(all_pieces+WHITE_PAWN, 'P', PAWN_MOVES_N, white_pawn_moves, 0);
-	set_piece(all_pieces+BLACK_PAWN, 'p', PAWN_MOVES_N, black_pawn_moves, 0);
+	set_piece(all_pieces+B_KING, 'k', ROYAL_MOVES_N, royal_moves, 0);
+	set_piece(all_pieces+W_QUEEN, 'Q', ROYAL_MOVES_N, royal_moves, 1);
+	set_piece(all_pieces+B_QUEEN, 'q', ROYAL_MOVES_N, royal_moves, 1);
+	set_piece(all_pieces+W_ROOK, 'R', ROOK_MOVES_N, rook_moves, 1);
+	set_piece(all_pieces+B_ROOK, 'r', ROOK_MOVES_N, rook_moves, 1);
+	set_piece(all_pieces+W_BISHOP, 'B', BISHOP_MOVES_N, bishop_moves, 1);
+	set_piece(all_pieces+B_BISHOP, 'b', BISHOP_MOVES_N, bishop_moves, 1);
+	set_piece(all_pieces+W_KNIGHT, 'N', KNIGHT_MOVES_N, knight_moves, 0);
+	set_piece(all_pieces+B_KNIGHT, 'n', KNIGHT_MOVES_N, knight_moves, 0);
+	set_piece(all_pieces+W_PAWN, 'P', PAWN_MOVES_N, w_pawn_moves, 0);
+	set_piece(all_pieces+B_PAWN, 'p', PAWN_MOVES_N, b_pawn_moves, 0);
 	set_piece(all_pieces+PIECE_OUTSIDE, '#', 0, NULL, 0);
 	set_piece(all_pieces+PIECE_UNDEFINED, '?', 0, NULL, 0);
 	set_piece(all_pieces+PIECE_EMPTY, '.', 0, NULL, 0);
-	set_piece(all_pieces+WHITE_THREAT, 'T', 0, NULL, 0);
-	set_piece(all_pieces+BLACK_THREAT, 't', 0, NULL, 0);
+	set_piece(all_pieces+W_THREAT, 'T', 0, NULL, 0);
+	set_piece(all_pieces+B_THREAT, 't', 0, NULL, 0);
 	set_piece(all_pieces+PIECE_OTHERS, '*', 0, NULL, 0);
 	mem_squares_n = mem_rows_n*mem_columns_n;
 	mem_squares = malloc(sizeof(square_t)*(size_t)mem_squares_n);
@@ -224,8 +226,8 @@ int main(int argc, char *argv[]) {
 			squares[squares_n++]->opposite = mem_squares+square_idx(mem_rows_n-i-1, mem_columns_n-j-1);
 		}
 	}
-	set_color(colors, white_pieces, all_pieces+WHITE_PAWN, all_pieces+BLACK_THREAT);
-	set_color(colors+COLOR_BLACK, black_pieces, all_pieces+BLACK_PAWN, all_pieces+WHITE_THREAT);
+	set_color(colors, w_pieces, all_pieces+W_PAWN, all_pieces+B_THREAT);
+	set_color(colors+COLOR_B, b_pieces, all_pieces+B_PAWN, all_pieces+W_THREAT);
 	threats = malloc(sizeof(threat_t)*(size_t)squares_n);
 	if (!threats) {
 		fputs("Could not allocate memory for threats\n", stderr);
@@ -260,10 +262,10 @@ int main(int argc, char *argv[]) {
 		int j;
 		set_king_square(squares[i], all_pieces, colors);
 		for (j = 0; j < squares_n; ++j) {
-			if (mpz_cmp_ui(cache[squares[i]->idx][squares[j]->idx], 0UL) > 0 || squares[j]->piece != all_pieces+PIECE_UNDEFINED || search_white_king(squares[j])) {
+			if (mpz_cmp_ui(cache[squares[i]->idx][squares[j]->idx], 0UL) > 0 || squares[j]->piece != all_pieces+PIECE_UNDEFINED || search_w_king(squares[j])) {
 				continue;
 			}
-			set_king_square(squares[j], all_pieces+BLACK_KING, colors+COLOR_BLACK);
+			set_king_square(squares[j], all_pieces+B_KING, colors+COLOR_B);
 			count_positions(squares[i], squares[j]);
 			squares[j]->piece = all_pieces+PIECE_UNDEFINED;
 		}
@@ -370,13 +372,13 @@ static void set_square(square_t *square, int row, int column, int idx, piece_t *
 	square->idx = idx;
 	square->piece = piece;
 	square->others_max = others_max;
-	init_state(square->states, COLOR_WHITE);
-	init_state(square->states+COLOR_BLACK, COLOR_BLACK);
+	init_state(square->states, COLOR_W);
+	init_state(square->states+COLOR_B, COLOR_B);
 }
 
 static void reset_states(square_t *square) {
 	reset_state(square->states);
-	reset_state(square->states+COLOR_BLACK);
+	reset_state(square->states+COLOR_B);
 }
 
 static void set_color(color_t *color, int officers[], piece_t *pawn, piece_t *threat_piece) {
@@ -399,16 +401,27 @@ static void reset_color(color_t *color) {
 static void set_threat(threat_t *threat, square_t *square) {
 	threat->square = square;
 	if (square) {
-		if (threat->square->states[COLOR_WHITE].step < threat->square->states[COLOR_BLACK].step) {
-			threat->min = threat->square->states[COLOR_WHITE].step;
-			threat->max = threat->square->states[COLOR_BLACK].step;
+		if (threat->square->states[COLOR_W].step < threat->square->states[COLOR_B].step) {
+			threat->step_min = threat->square->states[COLOR_W].step;
+			threat->step_max = threat->square->states[COLOR_B].step;
 		}
 		else {
-			threat->min = threat->square->states[COLOR_BLACK].step;
-			threat->max = threat->square->states[COLOR_WHITE].step;
+			threat->step_min = threat->square->states[COLOR_B].step;
+			threat->step_max = threat->square->states[COLOR_W].step;
 		}
-		if (!threat->min) {
-			threat->min = 1;
+		if (!threat->step_min) {
+			threat->step_min = threat->step_max;
+		}
+		if (threat->square->states[COLOR_W].move_idx < threat->square->states[COLOR_B].move_idx) {
+			threat->move_idx_min = threat->square->states[COLOR_W].move_idx;
+			threat->move_idx_max = threat->square->states[COLOR_B].move_idx;
+		}
+		else {
+			threat->move_idx_min = threat->square->states[COLOR_B].move_idx;
+			threat->move_idx_max = threat->square->states[COLOR_W].move_idx;
+		}
+		if (!threat->move_idx_min) {
+			threat->move_idx_min = threat->move_idx_max;
 		}
 	}
 	mpz_init(threat->positions);
@@ -417,10 +430,16 @@ static void set_threat(threat_t *threat, square_t *square) {
 
 static int compare_threats(const void *a, const void *b) {
 	const threat_t *threat_a = (const threat_t *)a, *threat_b = (const threat_t *)b;
-	if (threat_a->min != threat_b->min) {
-		return threat_a->min-threat_b->min;
+	if (threat_a->step_min != threat_b->step_min) {
+		return threat_a->step_min-threat_b->step_min;
 	}
-	return threat_a->max-threat_b->max;
+	if (threat_a->step_max != threat_b->step_max) {
+		return threat_a->step_max-threat_b->step_max;
+	}
+	if (threat_a->move_idx_min != threat_b->move_idx_min) {
+		return threat_a->move_idx_min-threat_b->move_idx_min;
+	}
+	return threat_a->move_idx_max-threat_b->move_idx_max;
 }
 
 static void set_king_square(square_t *square, piece_t *piece, color_t *color) {
@@ -428,10 +447,10 @@ static void set_king_square(square_t *square, piece_t *piece, color_t *color) {
 	color->king_square = square;
 }
 
-static int search_white_king(square_t *square) {
+static int search_w_king(square_t *square) {
 	int i;
-	for (i = 0; i < all_pieces[BLACK_KING].moves_n; ++i) {
-		if (mem_squares[square->idx-all_moves[all_pieces[BLACK_KING].moves[i]]].piece == all_pieces) {
+	for (i = 0; i < all_pieces[B_KING].moves_n; ++i) {
+		if (mem_squares[square->idx-all_moves[all_pieces[B_KING].moves[i]]].piece == all_pieces) {
 			return 1;
 		}
 	}
@@ -443,8 +462,8 @@ static void count_positions(square_t *w_square, square_t *b_square) {
 	for (i = 0; i < squares_n; ++i) {
 		reset_states(squares[i]);
 	}
-	set_color_states(w_square, COLOR_WHITE, MEM_OFFSET+1);
-	set_color_states(b_square, COLOR_BLACK, MEM_OFFSET+rows_n-2);
+	set_color_states(w_square, COLOR_W, MEM_OFFSET+1);
+	set_color_states(b_square, COLOR_B, MEM_OFFSET+rows_n-2);
 	for (i = 0; i < COLORS_N; ++i) {
 		reset_color(colors+i);
 	}
@@ -466,7 +485,7 @@ static void count_positions(square_t *w_square, square_t *b_square) {
 	mpz_mul(all_positions, all_positions, factor);
 	mpz_clear(factor);
 	set_cache(w_square, b_square);
-	if (colors[COLOR_WHITE].pawn_states == colors[COLOR_BLACK].pawn_states) {
+	if (colors[COLOR_W].pawn_states == colors[COLOR_B].pawn_states) {
 		if (b_square->h_mirror->column < b_square->column) {
 			set_cache(b_square->opposite, w_square->opposite);
 		}
@@ -516,7 +535,7 @@ static void set_piece_states(piece_t *piece, square_t *square, int color_idx) {
 }
 
 static void check_square_threats(square_t *square) {
-	if (square->states[COLOR_WHITE].count || square->states[COLOR_BLACK].count) {
+	if (square->states[COLOR_W].count || square->states[COLOR_B].count) {
 		int i;
 		for (i = 0; i < COLORS_N; ++i) {
 			update_state_less(square->states+i);
@@ -530,7 +549,7 @@ static void check_square_threats(square_t *square) {
 }
 
 static void search_positions(threat_t *threat) {
-	if (colors[COLOR_WHITE].in_check && colors[COLOR_BLACK].in_check) {
+	if (colors[COLOR_W].in_check && colors[COLOR_B].in_check) {
 		return;
 	}
 	if (threat < threats+threats_n) {
@@ -541,7 +560,7 @@ static void search_positions(threat_t *threat) {
 				choose_threat_piece(threat, threat->square->states+i);
 			}
 		}
-		if (more_influent_step(threat->square->states) || more_influent_step(threat->square->states+COLOR_BLACK)) {
+		if (more_influent_step(threat->square->states) || more_influent_step(threat->square->states+COLOR_B)) {
 			threat->square->piece = all_pieces+PIECE_EMPTY;
 			for (i = 0; i < COLORS_N; ++i) {
 				threat->in_checks[i] = colors[i].in_check;
@@ -575,7 +594,7 @@ static void search_positions(threat_t *threat) {
 	}
 	else {
 		mpz_add(all_positions, all_positions, (threat-1)->positions);
-		if ((options & COLOR_COUNTS) == COLOR_COUNTS && !colors[COLOR_WHITE].in_check && !colors[COLOR_BLACK].in_check) {
+		if ((options & COLOR_COUNTS) == COLOR_COUNTS && !colors[COLOR_W].in_check && !colors[COLOR_B].in_check) {
 			mpz_add(all_positions, all_positions, (threat-1)->positions);
 		}
 	}
