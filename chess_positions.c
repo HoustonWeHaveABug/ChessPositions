@@ -110,6 +110,7 @@ static void reset_states(square_t *);
 static void set_color(color_t *, int [], piece_t *, piece_t *);
 static void reset_color(color_t *);
 static void set_threat(threat_t *, square_t *);
+static void set_min_max(int, int, int *, int *);
 static int compare_threats(const void *, const void *);
 static void set_king_square(square_t *, piece_t *, color_t *);
 static int search_w_king(square_t *);
@@ -401,31 +402,25 @@ static void reset_color(color_t *color) {
 static void set_threat(threat_t *threat, square_t *square) {
 	threat->square = square;
 	if (square) {
-		if (threat->square->states[COLOR_W].step < threat->square->states[COLOR_B].step) {
-			threat->step_min = threat->square->states[COLOR_W].step;
-			threat->step_max = threat->square->states[COLOR_B].step;
-		}
-		else {
-			threat->step_min = threat->square->states[COLOR_B].step;
-			threat->step_max = threat->square->states[COLOR_W].step;
-		}
-		if (!threat->step_min) {
-			threat->step_min = threat->step_max;
-		}
-		if (threat->square->states[COLOR_W].move_idx < threat->square->states[COLOR_B].move_idx) {
-			threat->move_idx_min = threat->square->states[COLOR_W].move_idx;
-			threat->move_idx_max = threat->square->states[COLOR_B].move_idx;
-		}
-		else {
-			threat->move_idx_min = threat->square->states[COLOR_B].move_idx;
-			threat->move_idx_max = threat->square->states[COLOR_W].move_idx;
-		}
-		if (!threat->move_idx_min) {
-			threat->move_idx_min = threat->move_idx_max;
-		}
+		set_min_max(threat->square->states[COLOR_W].step, threat->square->states[COLOR_B].step, &threat->step_min, &threat->step_max);
+		set_min_max(threat->square->states[COLOR_W].move_idx, threat->square->states[COLOR_B].move_idx, &threat->move_idx_min, &threat->move_idx_max);
 	}
 	mpz_init(threat->positions);
 	mpz_add_ui(threat->positions, threat->positions, 1UL);
+}
+
+static void set_min_max(int w_val, int b_val, int *min, int *max) {
+	if (w_val < b_val) {
+		*min = w_val;
+		*max = b_val;
+	}
+	else {
+		*min = b_val;
+		*max = w_val;
+	}
+	if (*min == 0) {
+		*min = *max;
+	}
 }
 
 static int compare_threats(const void *a, const void *b) {

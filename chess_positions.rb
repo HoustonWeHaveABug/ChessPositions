@@ -114,32 +114,16 @@ class ChessThreat
   def initialize(square)
     @square = square
     @square = square
-    set_step_min_max(@square.states[0].step, @square.states[1].step)
-    set_move_idx_min_max(@square.states[0].move_idx, @square.states[1].move_idx)
+    @step_min, @step_max = set_min_max(@square.states[0].step, @square.states[1].step)
+    @move_idx_min, @move_idx_max = set_min_max(@square.states[0].move_idx, @square.states[1].move_idx)
     @last_steps = []
     @in_checks = []
   end
 
-  def set_step_min_max(w_step, b_step)
-    if w_step < b_step
-      @step_min = w_step
-      @step_max = b_step
-    else
-      @step_min = b_step
-      @step_max = w_step
-    end
-    @step_min = @step_max if @step_min.zero?
-  end
-
-  def set_move_idx_min_max(w_move_idx, b_move_idx)
-    if w_move_idx < b_move_idx
-      @move_idx_min = w_move_idx
-      @move_idx_max = b_move_idx
-    else
-      @move_idx_min = b_move_idx
-      @move_idx_max = w_move_idx
-    end
-    @move_idx_min = @move_idx_max if @move_idx_min.zero?
+  def set_min_max(w_val, b_val)
+    min, max = [w_val, b_val].minmax
+    min = max if min.zero?
+    [min, max]
   end
 
   def save_threat_piece(state, colors)
@@ -273,6 +257,9 @@ def set_threats
   @squares.each do |square|
     check_square_threats(square) if square.piece == @pieces['?']
   end
+  @threats.sort_by! do |threat|
+    [threat.step_min, threat.step_max, threat.move_idx_min, threat.move_idx_max]
+  end
 end
 
 def check_square_threats(square)
@@ -287,20 +274,6 @@ end
 def update_steps(square)
   square.states.each do |state|
     state.update_step_less(@colors)
-  end
-end
-
-def sort_threats
-  @threats.sort! do |a, b|
-    if a.step_min != b.step_min
-      a.step_min <=> b.step_min
-    elsif a.step_max != b.step_max
-      a.step_max <=> b.step_max
-    elsif a.move_idx_min != b.move_idx_min
-      a.move_idx_min <=> b.move_idx_min
-    else
-      a.move_idx_max <=> b.move_idx_max
-    end
   end
 end
 
@@ -480,7 +453,6 @@ end
     set_color_states(w_square, 0, 3)
     set_color_states(b_square, 1, @rows)
     set_threats
-    sort_threats
     @threats_size = @threats.size
     search_positions(0, 1)
     clear_threats
