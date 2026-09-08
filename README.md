@@ -28,7 +28,7 @@ The program loops on all possible placements of both kings on the chessboard and
     - Select the white pieces that can put the black king in check
     - Leave the square empty
     - Select the other pieces
-- The number of choices (hence the branching factor) can be further reduced in many cases, for example when one king is already in check, the pieces that can put this king in check can be merged with the "other" pieces.
+- The number of choices (hence the branching factor) can be further reduced in many cases. For example when one king is already in check, the pieces that can put this king in check can be merged with the "other" pieces.
 - The order in which the squares are processed also impacts the performance dramatically.
 
 The development was initially done in Ruby, and now a version written in C is also available. Both versions implement the same algorithm. The C program is much faster as shown in [chess_positions_results.txt](https://github.com/HoustonWeHaveABug/ChessPositions/blob/master/chess_positions_results.txt).
