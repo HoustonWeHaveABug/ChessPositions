@@ -78,7 +78,7 @@ class ChessSquare
     @states[1].reset
   end
 
-  def more_influent_step?(colors)
+  def more_influent_states?(colors)
     @states[0].more_influent_step?(colors) || @states[1].more_influent_step?(colors)
   end
 end
@@ -287,7 +287,7 @@ def choose_pieces(threat_idx, positions, threat)
   threat.square.states.each do |state|
     choose_threat_piece(threat_idx, positions, threat, state) if state.potential_check?(@colors)
   end
-  choose_empty(threat_idx, positions, threat) if threat.square.more_influent_step?(@colors)
+  choose_empty(threat_idx, positions, threat) if threat.square.more_influent_states?(@colors)
   choose_others(threat_idx, positions, threat)
 end
 

@@ -106,6 +106,7 @@ static int influent_step(const state_t *);
 static int more_influent_step(const state_t *);
 static void set_square(square_t *, int, int, int, piece_t *, unsigned long);
 static void reset_states(square_t *);
+static int more_influent_states(const square_t *);
 static void set_color(color_t *, int [], piece_t *, piece_t *);
 static void reset_color(color_t *);
 static void set_threat(threat_t *, square_t *);
@@ -349,6 +350,10 @@ static void reset_states(square_t *square) {
 	reset_state(square->states+COLOR_B);
 }
 
+static int more_influent_states(const square_t *square) {
+	return more_influent_step(square->states) || more_influent_step(square->states+COLOR_B);
+}
+
 static void set_color(color_t *color, int officers[], piece_t *pawn, piece_t *threat_piece) {
 	int i;
 	for (i = 0; i < OFFICERS_N; ++i) {
@@ -547,7 +552,7 @@ static void search_positions(threat_t *threat) {
 				choose_threat_piece(threat, threat->square->states+i);
 			}
 		}
-		if (more_influent_step(threat->square->states) || more_influent_step(threat->square->states+COLOR_B)) {
+		if (more_influent_states(threat->square)) {
 			threat->square->piece = all_pieces+PIECE_EMPTY;
 			for (i = 0; i < COLORS_N; ++i) {
 				threat->in_checks[i] = colors[i].in_check;
