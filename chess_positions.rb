@@ -9,10 +9,9 @@ end
 
 # Chess piece management
 class ChessPiece
-  attr_reader :symbol, :moves, :repeat_move
+  attr_reader :moves, :repeat_move
 
-  def initialize(symbol, moves, repeat_move)
-    @symbol = symbol
+  def initialize(moves, repeat_move)
     @moves = moves
     @repeat_move = repeat_move
   end
@@ -82,10 +81,6 @@ class ChessSquare
   def more_influent_step?(colors)
     @states[0].more_influent_step?(colors) || @states[1].more_influent_step?(colors)
   end
-
-  def output
-    putc(@piece.symbol)
-  end
 end
 
 # Chess color management
@@ -112,7 +107,6 @@ class ChessThreat
   attr_accessor :others
 
   def initialize(square)
-    @square = square
     @square = square
     @step_min, @step_max = set_min_max(@square.states[0].step, @square.states[1].step)
     @move_idx_min, @move_idx_max = set_min_max(@square.states[0].move_idx, @square.states[1].move_idx)
@@ -199,9 +193,9 @@ def square_idx(row, column)
   row * @mem_columns + column
 end
 
-def set_king_square(square, piece_idx, color_idx)
-  square.piece = @pieces[piece_idx]
-  @colors[color_idx].king_square = square
+def set_king_square(square, piece, color)
+  square.piece = piece
+  color.king_square = square
 end
 
 def search_w_king(square)
@@ -213,40 +207,40 @@ def search_w_king(square)
   false
 end
 
-def set_color_states(square, state_idx, row)
-  @colors[state_idx].officers.each do |piece|
-    set_piece_states(square, @pieces[piece], state_idx)
+def set_color_states(square, color_idx, row)
+  @colors[color_idx].officers.each do |piece|
+    set_piece_states(@pieces[piece], square, color_idx)
   end
-  @colors[state_idx].pawn_states = @options & 1 == 1 || square.row != row
-  set_piece_states(square, @colors[state_idx].pawn, state_idx) if @colors[state_idx].pawn_states
+  @colors[color_idx].pawn_states = @options & 1 == 1 || square.row != row
+  set_piece_states(@colors[color_idx].pawn, square, color_idx) if @colors[color_idx].pawn_states
 end
 
-def set_piece_states(square, piece, state_idx)
+def set_piece_states(piece, square, color_idx)
   if piece.repeat_move
-    set_states_repeat(square, piece, state_idx)
+    set_states_repeat(piece, square, color_idx)
   else
-    set_states_unique(square, piece, state_idx)
+    set_states_unique(piece, square, color_idx)
   end
 end
 
-def set_states_repeat(square, piece, state_idx)
+def set_states_repeat(piece, square, color_idx)
   piece.moves.each do |move_idx|
     target_idx = square.idx - @moves[move_idx]
     step = 1
     while @mem_squares[target_idx].piece == @pieces['?']
-      @mem_squares[target_idx].states[state_idx].set(move_idx, step)
+      @mem_squares[target_idx].states[color_idx].set(move_idx, step)
       target_idx -= @moves[move_idx]
       step += 1
     end
   end
 end
 
-def set_states_unique(square, piece, state_idx)
+def set_states_unique(piece, square, color_idx)
   piece.moves.each do |move_idx|
     target_idx = square.idx - @moves[move_idx]
     next unless @mem_squares[target_idx].piece == @pieces['?']
 
-    @mem_squares[target_idx].states[state_idx].set(move_idx, 1)
+    @mem_squares[target_idx].states[color_idx].set(move_idx, 1)
   end
 end
 
@@ -341,28 +335,6 @@ def set_cache(w_square, b_square)
   @cache[w_square.h_mirror.idx][b_square.h_mirror.idx] = @all_positions
 end
 
-def output_chessboard
-  (2..@rows + 1).each do |row|
-    (2..@columns + 1).each do |column|
-      @mem_squares[square_idx(row, column)].output
-    end
-    puts
-  end
-  puts @all_positions
-  $stdout.flush
-end
-
-def output_positions_sum
-  positions_sum = 0
-  @cache.each do |white|
-    white.each do |black|
-      positions_sum += black
-    end
-  end
-  puts "Positions #{positions_sum}"
-  $stdout.flush
-end
-
 usage unless ARGV.size == 3 && ARGV[0].integer? && ARGV[1].integer? && ARGV[2].integer?
 @rows = ARGV[0].to_i
 @columns = ARGV[1].to_i
@@ -390,24 +362,24 @@ usage unless @rows > 1 && @columns.positive? && @options >= 0 && @options < 8
   @mem_columns - 2
 ]
 @pieces = {
-  'K' => ChessPiece.new('K', [1, 2, 3, 4, 5, 6, 7, 8], false),
-  'k' => ChessPiece.new('k', [1, 2, 3, 4, 5, 6, 7, 8], false),
-  'Q' => ChessPiece.new('Q', [1, 2, 3, 4, 5, 6, 7, 8], true),
-  'q' => ChessPiece.new('q', [1, 2, 3, 4, 5, 6, 7, 8], true),
-  'R' => ChessPiece.new('R', [1, 3, 5, 7], true),
-  'r' => ChessPiece.new('r', [1, 3, 5, 7], true),
-  'B' => ChessPiece.new('B', [2, 4, 6, 8], true),
-  'b' => ChessPiece.new('b', [2, 4, 6, 8], true),
-  'N' => ChessPiece.new('N', [9, 10, 11, 12, 13, 14, 15, 16], false),
-  'n' => ChessPiece.new('n', [9, 10, 11, 12, 13, 14, 15, 16], false),
-  'P' => ChessPiece.new('P', [2, 4], false),
-  'p' => ChessPiece.new('p', [6, 8], false),
-  '#' => ChessPiece.new('#', nil, false),
-  '?' => ChessPiece.new('?', nil, false),
-  '.' => ChessPiece.new('.', nil, false),
-  'T' => ChessPiece.new('T', nil, false),
-  't' => ChessPiece.new('t', nil, false),
-  '*' => ChessPiece.new('*', nil, false)
+  'K' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], false),
+  'k' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], false),
+  'Q' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], true),
+  'q' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], true),
+  'R' => ChessPiece.new([1, 3, 5, 7], true),
+  'r' => ChessPiece.new([1, 3, 5, 7], true),
+  'B' => ChessPiece.new([2, 4, 6, 8], true),
+  'b' => ChessPiece.new([2, 4, 6, 8], true),
+  'N' => ChessPiece.new([9, 10, 11, 12, 13, 14, 15, 16], false),
+  'n' => ChessPiece.new([9, 10, 11, 12, 13, 14, 15, 16], false),
+  'P' => ChessPiece.new([2, 4], false),
+  'p' => ChessPiece.new([6, 8], false),
+  '#' => ChessPiece.new(nil, false),
+  '?' => ChessPiece.new(nil, false),
+  '.' => ChessPiece.new(nil, false),
+  'T' => ChessPiece.new(nil, false),
+  't' => ChessPiece.new(nil, false),
+  '*' => ChessPiece.new(nil, false)
 }
 @mem_squares = []
 2.times do |row|
@@ -444,11 +416,11 @@ end
   Array.new(@mem_rows * @mem_columns, 0)
 end
 @squares.each do |w_square|
-  set_king_square(w_square, 'K', 0)
+  set_king_square(w_square, @pieces['K'], @colors[0])
   @squares.each do |b_square|
     next if @cache[w_square.idx][b_square.idx].positive? || search_w_king(b_square)
 
-    set_king_square(b_square, 'k', 1)
+    set_king_square(b_square, @pieces['k'], @colors[1])
     @squares.each(&:reset_states)
     set_color_states(w_square, 0, 3)
     set_color_states(b_square, 1, @rows)
@@ -464,9 +436,17 @@ end
         set_cache(b_square.v_mirror, w_square.v_mirror)
       end
     end
-    output_chessboard
+    puts "Position #{w_square.idx}/#{b_square.idx} #{@all_positions}"
+    $stdout.flush
     b_square.piece = @pieces['?']
   end
   w_square.piece = @pieces['?']
 end
-output_positions_sum
+positions_sum = 0
+@cache.each do |white|
+  white.each do |black|
+    positions_sum += black
+  end
+end
+puts "Total #{positions_sum}"
+$stdout.flush

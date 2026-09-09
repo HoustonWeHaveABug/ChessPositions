@@ -39,7 +39,6 @@
 #define MEM_OFFSET 2
 
 typedef struct{
-	int symbol;
 	int moves_n;
 	int moves[ROYAL_MOVES_N];
 	int repeat_move;
@@ -62,10 +61,10 @@ struct square_s {
 	int idx;
 	piece_t *piece;
 	unsigned long others_max;
+	state_t states[COLORS_N];
 	square_t *h_mirror;
 	square_t *v_mirror;
 	square_t *opposite;
-	state_t states[COLORS_N];
 };
 
 typedef struct {
@@ -96,7 +95,7 @@ static void usage(void);
 static void set_row(int, piece_t *, unsigned long);
 static void set_side(int, int, int);
 static int square_idx(int, int);
-static void set_piece(piece_t *, int, int, int [], int);
+static void set_piece(piece_t *, int, int [], int);
 static void init_state(state_t *, int);
 static void reset_state(state_t *);
 static void set_state(state_t *, int, int);
@@ -166,24 +165,24 @@ int main(int argc, char *argv[]) {
 	all_moves[14] = mem_columns_n*2+1;
 	all_moves[15] = mem_columns_n*2-1;
 	all_moves[16] = mem_columns_n-2;
-	set_piece(all_pieces, 'K', ROYAL_MOVES_N, royal_moves, 0);
-	set_piece(all_pieces+B_KING, 'k', ROYAL_MOVES_N, royal_moves, 0);
-	set_piece(all_pieces+W_QUEEN, 'Q', ROYAL_MOVES_N, royal_moves, 1);
-	set_piece(all_pieces+B_QUEEN, 'q', ROYAL_MOVES_N, royal_moves, 1);
-	set_piece(all_pieces+W_ROOK, 'R', ROOK_MOVES_N, rook_moves, 1);
-	set_piece(all_pieces+B_ROOK, 'r', ROOK_MOVES_N, rook_moves, 1);
-	set_piece(all_pieces+W_BISHOP, 'B', BISHOP_MOVES_N, bishop_moves, 1);
-	set_piece(all_pieces+B_BISHOP, 'b', BISHOP_MOVES_N, bishop_moves, 1);
-	set_piece(all_pieces+W_KNIGHT, 'N', KNIGHT_MOVES_N, knight_moves, 0);
-	set_piece(all_pieces+B_KNIGHT, 'n', KNIGHT_MOVES_N, knight_moves, 0);
-	set_piece(all_pieces+W_PAWN, 'P', PAWN_MOVES_N, w_pawn_moves, 0);
-	set_piece(all_pieces+B_PAWN, 'p', PAWN_MOVES_N, b_pawn_moves, 0);
-	set_piece(all_pieces+PIECE_OUTSIDE, '#', 0, NULL, 0);
-	set_piece(all_pieces+PIECE_UNDEFINED, '?', 0, NULL, 0);
-	set_piece(all_pieces+PIECE_EMPTY, '.', 0, NULL, 0);
-	set_piece(all_pieces+W_THREAT, 'T', 0, NULL, 0);
-	set_piece(all_pieces+B_THREAT, 't', 0, NULL, 0);
-	set_piece(all_pieces+PIECE_OTHERS, '*', 0, NULL, 0);
+	set_piece(all_pieces, ROYAL_MOVES_N, royal_moves, 0);
+	set_piece(all_pieces+B_KING, ROYAL_MOVES_N, royal_moves, 0);
+	set_piece(all_pieces+W_QUEEN, ROYAL_MOVES_N, royal_moves, 1);
+	set_piece(all_pieces+B_QUEEN, ROYAL_MOVES_N, royal_moves, 1);
+	set_piece(all_pieces+W_ROOK, ROOK_MOVES_N, rook_moves, 1);
+	set_piece(all_pieces+B_ROOK, ROOK_MOVES_N, rook_moves, 1);
+	set_piece(all_pieces+W_BISHOP, BISHOP_MOVES_N, bishop_moves, 1);
+	set_piece(all_pieces+B_BISHOP, BISHOP_MOVES_N, bishop_moves, 1);
+	set_piece(all_pieces+W_KNIGHT, KNIGHT_MOVES_N, knight_moves, 0);
+	set_piece(all_pieces+B_KNIGHT, KNIGHT_MOVES_N, knight_moves, 0);
+	set_piece(all_pieces+W_PAWN, PAWN_MOVES_N, w_pawn_moves, 0);
+	set_piece(all_pieces+B_PAWN, PAWN_MOVES_N, b_pawn_moves, 0);
+	set_piece(all_pieces+PIECE_OUTSIDE, 0, NULL, 0);
+	set_piece(all_pieces+PIECE_UNDEFINED, 0, NULL, 0);
+	set_piece(all_pieces+PIECE_EMPTY, 0, NULL, 0);
+	set_piece(all_pieces+W_THREAT, 0, NULL, 0);
+	set_piece(all_pieces+B_THREAT, 0, NULL, 0);
+	set_piece(all_pieces+PIECE_OTHERS, 0, NULL, 0);
 	mem_squares_n = mem_rows_n*mem_columns_n;
 	mem_squares = malloc(sizeof(square_t)*(size_t)mem_squares_n);
 	if (!mem_squares) {
@@ -279,46 +278,14 @@ int main(int argc, char *argv[]) {
 			mpz_add(positions_sum, positions_sum, cache[i][j]);
 		}
 	}
-	printf("Positions ");
+	printf("Total ");
 	output_result(positions_sum);
 	free_data(mem_squares_n);
 	return EXIT_SUCCESS;
 }
 
-static void usage(void) {
-	fputs("Program arguments: <rows> <columns> <options>\n", stderr);
-	fprintf(stderr, "<rows> must be greater than or equal to %d\n", COLORS_N);
-	fputs("<columns> must be greater than 0\n", stderr);
-	fputs("<options> is the sum of the below flags:\n", stderr);
-	fprintf(stderr, "%d = pawns allowed on first row\n", PAWNS_FIRST_ROW);
-	fprintf(stderr, "%d = pawns allowed on last row (no promotions)\n", PAWNS_LAST_ROW);
-	fprintf(stderr, "%d = color on move counts (positions where no kings are in chess will be counted twice)\n", COLOR_COUNTS);
-	fflush(stderr);
-}
-
-static void set_row(int row, piece_t *piece, unsigned long others_max) {
+static void set_piece(piece_t *piece, int moves_n, int moves[], int repeat_move) {
 	int i;
-	set_side(row, 0, MEM_OFFSET);
-	for (i = MEM_OFFSET; i < MEM_OFFSET+columns_n; ++i) {
-		set_square(mem_squares+square_idx(row, i), row, i, square_idx(row, i), piece, others_max);
-	}
-	set_side(row, MEM_OFFSET+columns_n, mem_columns_n);
-}
-
-static void set_side(int row, int column_a, int column_b) {
-	int i;
-	for (i = column_a; i < column_b; ++i) {
-		set_square(mem_squares+square_idx(row, i), row, i, square_idx(row, i), all_pieces+PIECE_OUTSIDE, 0UL);
-	}
-}
-
-static int square_idx(int row, int column) {
-	return row*mem_columns_n+column;
-}
-
-static void set_piece(piece_t *piece, int symbol, int moves_n, int moves[], int repeat_move) {
-	int i;
-	piece->symbol = symbol;
 	piece->moves_n = moves_n;
 	for (i = 0; i < moves_n; ++i) {
 		piece->moves[i] = moves[i];
@@ -406,7 +373,6 @@ static void set_threat(threat_t *threat, square_t *square) {
 		set_min_max(threat->square->states[COLOR_W].move_idx, threat->square->states[COLOR_B].move_idx, &threat->move_idx_min, &threat->move_idx_max);
 	}
 	mpz_init(threat->positions);
-	mpz_add_ui(threat->positions, threat->positions, 1UL);
 }
 
 static void set_min_max(int w_val, int b_val, int *min, int *max) {
@@ -435,6 +401,37 @@ static int compare_threats(const void *a, const void *b) {
 		return threat_a->move_idx_min-threat_b->move_idx_min;
 	}
 	return threat_a->move_idx_max-threat_b->move_idx_max;
+}
+
+static void usage(void) {
+	fputs("Program arguments: <rows> <columns> <options>\n", stderr);
+	fprintf(stderr, "<rows> must be greater than or equal to %d\n", COLORS_N);
+	fputs("<columns> must be greater than 0\n", stderr);
+	fputs("<options> is the sum of the below flags:\n", stderr);
+	fprintf(stderr, "%d = pawns allowed on first row\n", PAWNS_FIRST_ROW);
+	fprintf(stderr, "%d = pawns allowed on last row (no promotions)\n", PAWNS_LAST_ROW);
+	fprintf(stderr, "%d = color on move counts (positions where no kings are in chess will be counted twice)\n", COLOR_COUNTS);
+	fflush(stderr);
+}
+
+static void set_row(int row, piece_t *piece, unsigned long others_max) {
+	int i;
+	set_side(row, 0, MEM_OFFSET);
+	for (i = MEM_OFFSET; i < MEM_OFFSET+columns_n; ++i) {
+		set_square(mem_squares+square_idx(row, i), row, i, square_idx(row, i), piece, others_max);
+	}
+	set_side(row, MEM_OFFSET+columns_n, mem_columns_n);
+}
+
+static void set_side(int row, int column_a, int column_b) {
+	int i;
+	for (i = column_a; i < column_b; ++i) {
+		set_square(mem_squares+square_idx(row, i), row, i, square_idx(row, i), all_pieces+PIECE_OUTSIDE, 0UL);
+	}
+}
+
+static int square_idx(int row, int column) {
+	return row*mem_columns_n+column;
 }
 
 static void set_king_square(square_t *square, piece_t *piece, color_t *color) {
@@ -466,6 +463,7 @@ static void count_positions(square_t *w_square, square_t *b_square) {
 	mpz_init(factor);
 	mpz_add_ui(factor, factor, 1UL);
 	set_threat(threats, NULL);
+	mpz_add_ui(threats->positions, threats->positions, 1UL);
 	threats_n = 1;
 	for (i = 0; i < squares_n; ++i) {
 		if (squares[i]->piece == all_pieces+PIECE_UNDEFINED) {
@@ -488,13 +486,7 @@ static void count_positions(square_t *w_square, square_t *b_square) {
 			set_cache(b_square->v_mirror, w_square->v_mirror);
 		}
 	}
-	for (i = MEM_OFFSET; i < MEM_OFFSET+rows_n; ++i) {
-		int j;
-		for (j = MEM_OFFSET; j < MEM_OFFSET+columns_n; ++j) {
-			putchar(mem_squares[square_idx(i, j)].piece->symbol);
-		}
-		puts("");
-	}
+	printf("Position %d/%d ", w_square->idx, b_square->idx);
 	output_result(all_positions);
 }
 
