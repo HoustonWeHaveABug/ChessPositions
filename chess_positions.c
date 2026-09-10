@@ -12,23 +12,18 @@
 #define OFFICERS_N 4
 #define OTHERS_MAX 9UL
 #define PIECES_N 18
-#define B_KING 1
-#define W_QUEEN 2
-#define B_QUEEN 3
-#define W_ROOK 4
-#define B_ROOK 5
-#define W_BISHOP 6
-#define B_BISHOP 7
-#define W_KNIGHT 8
-#define B_KNIGHT 9
-#define W_PAWN 10
-#define B_PAWN 11
-#define PIECE_OUTSIDE 12
-#define PIECE_UNDEFINED 13
-#define PIECE_EMPTY 14
-#define W_THREAT 15
-#define B_THREAT 16
-#define PIECE_OTHERS 17
+#define WB_QUEEN 1
+#define WB_ROOK 2
+#define WB_BISHOP 3
+#define WB_KNIGHT 4
+#define W_PAWN 5
+#define B_PAWN 6
+#define PIECE_OUTSIDE 7
+#define PIECE_UNDEFINED 8
+#define PIECE_EMPTY 9
+#define W_THREAT 10
+#define B_THREAT 11
+#define PIECE_OTHERS 12
 #define COLOR_W 0
 #define COLOR_B 1
 #define COLORS_N 2
@@ -113,7 +108,7 @@ static void set_threat(threat_t *, square_t *);
 static void set_min_max(int, int, int *, int *);
 static int compare_threats(const void *, const void *);
 static void set_king_square(square_t *, piece_t *, color_t *);
-static int search_w_king(square_t *);
+static int search_king(square_t *);
 static void count_positions(square_t *, square_t *);
 static void set_color_states(square_t *, int, int);
 static void set_piece_states(piece_t *, square_t *, int);
@@ -133,7 +128,7 @@ static threat_t *threats;
 static mpz_t **cache, all_positions, factor;
 
 int main(int argc, char *argv[]) {
-	int mem_rows_n, royal_moves[ROYAL_MOVES_N] = { 1, 2, 3, 4, 5, 6, 7, 8 }, rook_moves[ROOK_MOVES_N] = { 1, 3, 5, 7 }, bishop_moves[BISHOP_MOVES_N] = { 2, 4, 6, 8 }, knight_moves[KNIGHT_MOVES_N] = { 9, 10, 11, 12, 13, 14, 15, 16 }, w_pawn_moves[PAWN_MOVES_N] = { 2, 4 }, b_pawn_moves[PAWN_MOVES_N] = { 6, 8 }, w_pieces[OFFICERS_N] = { W_QUEEN, W_ROOK, W_BISHOP, W_KNIGHT }, b_pieces[OFFICERS_N] = { B_QUEEN, B_ROOK, B_BISHOP, B_KNIGHT }, i;
+	int mem_rows_n, royal_moves[ROYAL_MOVES_N] = { 1, 2, 3, 4, 5, 6, 7, 8 }, rook_moves[ROOK_MOVES_N] = { 1, 3, 5, 7 }, bishop_moves[BISHOP_MOVES_N] = { 2, 4, 6, 8 }, knight_moves[KNIGHT_MOVES_N] = { 9, 10, 11, 12, 13, 14, 15, 16 }, w_pawn_moves[PAWN_MOVES_N] = { 2, 4 }, b_pawn_moves[PAWN_MOVES_N] = { 6, 8 }, officers[OFFICERS_N] = { WB_QUEEN, WB_ROOK, WB_BISHOP, WB_KNIGHT }, i;
 	unsigned long others_max;
 	mpz_t positions_sum;
 	if (argc != 4) {
@@ -167,15 +162,10 @@ int main(int argc, char *argv[]) {
 	all_moves[15] = mem_columns_n*2-1;
 	all_moves[16] = mem_columns_n-2;
 	set_piece(all_pieces, ROYAL_MOVES_N, royal_moves, 0);
-	set_piece(all_pieces+B_KING, ROYAL_MOVES_N, royal_moves, 0);
-	set_piece(all_pieces+W_QUEEN, ROYAL_MOVES_N, royal_moves, 1);
-	set_piece(all_pieces+B_QUEEN, ROYAL_MOVES_N, royal_moves, 1);
-	set_piece(all_pieces+W_ROOK, ROOK_MOVES_N, rook_moves, 1);
-	set_piece(all_pieces+B_ROOK, ROOK_MOVES_N, rook_moves, 1);
-	set_piece(all_pieces+W_BISHOP, BISHOP_MOVES_N, bishop_moves, 1);
-	set_piece(all_pieces+B_BISHOP, BISHOP_MOVES_N, bishop_moves, 1);
-	set_piece(all_pieces+W_KNIGHT, KNIGHT_MOVES_N, knight_moves, 0);
-	set_piece(all_pieces+B_KNIGHT, KNIGHT_MOVES_N, knight_moves, 0);
+	set_piece(all_pieces+WB_QUEEN, ROYAL_MOVES_N, royal_moves, 1);
+	set_piece(all_pieces+WB_ROOK, ROOK_MOVES_N, rook_moves, 1);
+	set_piece(all_pieces+WB_BISHOP, BISHOP_MOVES_N, bishop_moves, 1);
+	set_piece(all_pieces+WB_KNIGHT, KNIGHT_MOVES_N, knight_moves, 0);
 	set_piece(all_pieces+W_PAWN, PAWN_MOVES_N, w_pawn_moves, 0);
 	set_piece(all_pieces+B_PAWN, PAWN_MOVES_N, b_pawn_moves, 0);
 	set_piece(all_pieces+PIECE_OUTSIDE, 0, NULL, 0);
@@ -227,8 +217,8 @@ int main(int argc, char *argv[]) {
 			squares[squares_n++]->opposite = mem_squares+square_idx(mem_rows_n-i-1, mem_columns_n-j-1);
 		}
 	}
-	set_color(colors, w_pieces, all_pieces+W_PAWN, all_pieces+B_THREAT);
-	set_color(colors+COLOR_B, b_pieces, all_pieces+B_PAWN, all_pieces+W_THREAT);
+	set_color(colors, officers, all_pieces+W_PAWN, all_pieces+B_THREAT);
+	set_color(colors+COLOR_B, officers, all_pieces+B_PAWN, all_pieces+W_THREAT);
 	threats = malloc(sizeof(threat_t)*(size_t)squares_n);
 	if (!threats) {
 		fputs("Could not allocate memory for threats\n", stderr);
@@ -263,10 +253,10 @@ int main(int argc, char *argv[]) {
 		int j;
 		set_king_square(squares[i], all_pieces, colors);
 		for (j = 0; j < squares_n; ++j) {
-			if (mpz_cmp_ui(cache[squares[i]->idx][squares[j]->idx], 0UL) > 0 || squares[j]->piece != all_pieces+PIECE_UNDEFINED || search_w_king(squares[j])) {
+			if (mpz_cmp_ui(cache[squares[i]->idx][squares[j]->idx], 0UL) > 0 || squares[j]->piece != all_pieces+PIECE_UNDEFINED || search_king(squares[j])) {
 				continue;
 			}
-			set_king_square(squares[j], all_pieces+B_KING, colors+COLOR_B);
+			set_king_square(squares[j], all_pieces, colors+COLOR_B);
 			count_positions(squares[i], squares[j]);
 			squares[j]->piece = all_pieces+PIECE_UNDEFINED;
 		}
@@ -444,10 +434,10 @@ static void set_king_square(square_t *square, piece_t *piece, color_t *color) {
 	color->king_square = square;
 }
 
-static int search_w_king(square_t *square) {
+static int search_king(square_t *square) {
 	int i;
-	for (i = 0; i < all_pieces[B_KING].moves_n; ++i) {
-		if (mem_squares[square->idx-all_moves[all_pieces[B_KING].moves[i]]].piece == all_pieces) {
+	for (i = 0; i < all_pieces->moves_n; ++i) {
+		if (mem_squares[square->idx-all_moves[all_pieces->moves[i]]].piece == all_pieces) {
 			return 1;
 		}
 	}

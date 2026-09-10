@@ -201,8 +201,8 @@ end
 def search_w_king(square)
   return true if square.piece != @pieces['?']
 
-  @pieces['k'].moves.each do |move_idx|
-    return true if @mem_squares[square.idx - @moves[move_idx]].piece == @pieces['K']
+  @pieces['Kk'].moves.each do |move_idx|
+    return true if @mem_squares[square.idx - @moves[move_idx]].piece == @pieces['Kk']
   end
   false
 end
@@ -362,16 +362,11 @@ usage unless @rows > 1 && @columns.positive? && @options >= 0 && @options < 8
   @mem_columns - 2
 ]
 @pieces = {
-  'K' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], false),
-  'k' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], false),
-  'Q' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], true),
-  'q' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], true),
-  'R' => ChessPiece.new([1, 3, 5, 7], true),
-  'r' => ChessPiece.new([1, 3, 5, 7], true),
-  'B' => ChessPiece.new([2, 4, 6, 8], true),
-  'b' => ChessPiece.new([2, 4, 6, 8], true),
-  'N' => ChessPiece.new([9, 10, 11, 12, 13, 14, 15, 16], false),
-  'n' => ChessPiece.new([9, 10, 11, 12, 13, 14, 15, 16], false),
+  'Kk' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], false),
+  'Qq' => ChessPiece.new([1, 2, 3, 4, 5, 6, 7, 8], true),
+  'Rr' => ChessPiece.new([1, 3, 5, 7], true),
+  'Bb' => ChessPiece.new([2, 4, 6, 8], true),
+  'Nn' => ChessPiece.new([9, 10, 11, 12, 13, 14, 15, 16], false),
   'P' => ChessPiece.new([2, 4], false),
   'p' => ChessPiece.new([6, 8], false),
   '#' => ChessPiece.new(nil, false),
@@ -408,19 +403,19 @@ end
   square.opposite = @mem_squares[square_idx(@mem_rows - square.row - 1, @mem_columns - square.column - 1)]
 end
 @colors = [
-  ChessColor.new(%w[Q R B N], @pieces['P'], @pieces['t']),
-  ChessColor.new(%w[q r b n], @pieces['p'], @pieces['T'])
+  ChessColor.new(%w[Qq Rr Bb Nn], @pieces['P'], @pieces['t']),
+  ChessColor.new(%w[Qq Rr Bb Nn], @pieces['p'], @pieces['T'])
 ]
 @threats = []
 @cache = Array.new(@mem_rows * @mem_columns) do
   Array.new(@mem_rows * @mem_columns, 0)
 end
 @squares.each do |w_square|
-  set_king_square(w_square, @pieces['K'], @colors[0])
+  set_king_square(w_square, @pieces['Kk'], @colors[0])
   @squares.each do |b_square|
     next if @cache[w_square.idx][b_square.idx].positive? || search_w_king(b_square)
 
-    set_king_square(b_square, @pieces['k'], @colors[1])
+    set_king_square(b_square, @pieces['Kk'], @colors[1])
     @squares.each(&:reset_states)
     set_color_states(w_square, 0, 3)
     set_color_states(b_square, 1, @rows)
