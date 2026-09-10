@@ -4,8 +4,8 @@ Options: pawns allowed on first & last rows, color on move counts.
 
 Version	Size	Time (Ruby)	Time (C)	Positions
 v3.4	2x1	0.07s	0.00s	0
-v3.4	2x2	0.07s	0.00s	0
 v3.3	3x1	0.08s	0.00s	36
+v3.4	2x2	0.07s	0.00s	0
 v3.3	4x1	0.07s	0.00s	1108
 v3.3	5x1	0.06s	0.00s	23432
 v3.3	2x3	0.06s	0.00s	114444
