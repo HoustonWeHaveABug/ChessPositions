@@ -198,7 +198,7 @@ def set_king_square(square, piece, color)
   color.king_square = square
 end
 
-def search_w_king(square)
+def search_king(square)
   return true if square.piece != @pieces['?']
 
   @pieces['Kk'].moves.each do |move_idx|
@@ -413,7 +413,7 @@ end
 @squares.each do |w_square|
   set_king_square(w_square, @pieces['Kk'], @colors[0])
   @squares.each do |b_square|
-    next if @cache[w_square.idx][b_square.idx].positive? || search_w_king(b_square)
+    next if @cache[w_square.idx][b_square.idx].positive? || search_king(b_square)
 
     set_king_square(b_square, @pieces['Kk'], @colors[1])
     @squares.each(&:reset_states)
