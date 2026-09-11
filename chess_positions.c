@@ -41,7 +41,7 @@ typedef struct{
 piece_t;
 
 typedef struct {
-	int idx;
+	int color_idx;
 	int move_idx;
 	int step;
 	unsigned long count;
@@ -253,7 +253,7 @@ int main(int argc, char *argv[]) {
 		int j;
 		set_king_square(squares[i], all_pieces, colors);
 		for (j = 0; j < squares_n; ++j) {
-			if (mpz_cmp_ui(cache[squares[i]->idx][squares[j]->idx], 0UL) > 0 || squares[j]->piece != all_pieces+PIECE_UNDEFINED || search_king(squares[j])) {
+			if (mpz_cmp_ui(cache[squares[i]->idx][squares[j]->idx], 0UL) > 0 || search_king(squares[j])) {
 				continue;
 			}
 			set_king_square(squares[j], all_pieces, colors+COLOR_B);
@@ -284,8 +284,8 @@ static void set_piece(piece_t *piece, int moves_n, int moves[], int repeat_move)
 	piece->repeat_move = repeat_move;
 }
 
-static void init_state(state_t *state, int idx) {
-	state->idx = idx;
+static void init_state(state_t *state, int color_idx) {
+	state->color_idx = color_idx;
 	reset_state(state);
 }
 
@@ -303,26 +303,26 @@ static void set_state(state_t *state, int move_idx, int step) {
 
 static void update_state_less(state_t *state) {
 	if (!influent_step(state)) {
-		colors[state->idx].last_steps[state->move_idx] = state->step;
+		colors[state->color_idx].last_steps[state->move_idx] = state->step;
 	}
 }
 
 static void update_state_more(state_t *state) {
 	if (more_influent_step(state)) {
-		colors[state->idx].last_steps[state->move_idx] = state->step;
+		colors[state->color_idx].last_steps[state->move_idx] = state->step;
 	}
 }
 
 static int potential_check(const state_t *state) {
-	return influent_step(state) && state->count && !colors[state->idx].in_check;
+	return influent_step(state) && state->count && !colors[state->color_idx].in_check;
 }
 
 static int influent_step(const state_t *state) {
-	return state->step <= colors[state->idx].last_steps[state->move_idx];
+	return state->step <= colors[state->color_idx].last_steps[state->move_idx];
 }
 
 static int more_influent_step(const state_t *state) {
-	return state->step < colors[state->idx].last_steps[state->move_idx];
+	return state->step < colors[state->color_idx].last_steps[state->move_idx];
 }
 
 static void set_square(square_t *square, int row, int column, int idx, piece_t *piece, unsigned long others_max) {
@@ -436,6 +436,9 @@ static void set_king_square(square_t *square, piece_t *piece, color_t *color) {
 
 static int search_king(square_t *square) {
 	int i;
+	if (square->piece == all_pieces) {
+		return 1;
+	}
 	for (i = 0; i < all_pieces->moves_n; ++i) {
 		if (mem_squares[square->idx-all_moves[all_pieces->moves[i]]].piece == all_pieces) {
 			return 1;
@@ -583,15 +586,15 @@ static void search_positions(threat_t *threat) {
 }
 
 static void choose_threat_piece(threat_t *threat, state_t *state) {
-	threat->square->piece = colors[state->idx].threat_piece;
-	threat->last_steps[state->idx] = colors[state->idx].last_steps[state->move_idx];
-	threat->in_checks[state->idx] = colors[state->idx].in_check;
+	threat->square->piece = colors[state->color_idx].threat_piece;
+	threat->last_steps[state->color_idx] = colors[state->color_idx].last_steps[state->move_idx];
+	threat->in_checks[state->color_idx] = colors[state->color_idx].in_check;
 	update_state_more(state);
-	search_color_threat(colors+state->idx, state->move_idx);
+	search_color_threat(colors+state->color_idx, state->move_idx);
 	mpz_mul_ui(threat->positions, (threat-1)->positions, state->count);
 	search_positions(threat+1);
-	colors[state->idx].in_check = threat->in_checks[state->idx];
-	colors[state->idx].last_steps[state->move_idx] = threat->last_steps[state->idx];
+	colors[state->color_idx].in_check = threat->in_checks[state->color_idx];
+	colors[state->color_idx].last_steps[state->move_idx] = threat->last_steps[state->color_idx];
 	threat->square->piece = all_pieces+PIECE_UNDEFINED;
 	threat->others -= state->count;
 }
