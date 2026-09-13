@@ -2,7 +2,7 @@
 
 ## Problem solved by the program
 
-Count the number of valid positions on a chessboard of given size such that:
+Count the number of valid positions on a chessboard of given size (including the symmetric ones) such that:
 
 - Both kings must be on the board (and there can only be one of each color)
 - Not both kings can be in check
@@ -44,6 +44,8 @@ A threatening square has a number of pieces associated with each choice that may
 Before starting the search, the threatening squares are sorted by their proximity with the kings (this improves the search performance dramatically).
 
 The number of valid positions for the non-threatening squares is computed once per search (as only one constant choice is associated with each of them). It is multiplied by the total number of valid positions found at the end of the search.
+
+Each search result is stored in memory and replicated to all the similar placements (by symmetry). A search will be skipped if the number of solutions was already computed for a similar one. The final count is the sum of all stored search results.
 
 ## History & Results
 
