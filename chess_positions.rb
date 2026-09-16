@@ -185,7 +185,7 @@ end
 
 def set_side(row, column_a, column_b)
   (column_a..column_b).each do |column|
-    @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), @pieces['#'], 0)
+    @mem_squares[square_idx(row, column)] = ChessSquare.new(row, column, square_idx(row, column), @pieces['*'], 0)
   end
 end
 
@@ -369,7 +369,6 @@ usage unless @rows > 1 && @columns.positive? && @options >= 0 && @options < 8
   'Nn' => ChessPiece.new([9, 10, 11, 12, 13, 14, 15, 16], false),
   'P' => ChessPiece.new([2, 4], false),
   'p' => ChessPiece.new([6, 8], false),
-  '#' => ChessPiece.new(nil, false),
   '?' => ChessPiece.new(nil, false),
   '.' => ChessPiece.new(nil, false),
   'T' => ChessPiece.new(nil, false),
@@ -378,7 +377,7 @@ usage unless @rows > 1 && @columns.positive? && @options >= 0 && @options < 8
 }
 @mem_squares = []
 2.times do |row|
-  set_row(row, @pieces['#'], 0)
+  set_row(row, @pieces['*'], 0)
 end
 others_max = 9
 others_max += 1 if @options & 1 == 1
@@ -389,7 +388,7 @@ set_row(2, @pieces['?'], others_max)
 end
 set_row(@rows + 1, @pieces['?'], others_max)
 (@rows + 2..@mem_rows - 1).each do |row|
-  set_row(row, @pieces['#'], 0)
+  set_row(row, @pieces['*'], 0)
 end
 @squares = []
 (2..@rows + 1).each do |row|

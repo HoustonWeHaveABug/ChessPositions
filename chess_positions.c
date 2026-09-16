@@ -18,12 +18,11 @@
 #define WB_KNIGHT 4
 #define W_PAWN 5
 #define B_PAWN 6
-#define PIECE_OUTSIDE 7
-#define PIECE_UNDEFINED 8
-#define PIECE_EMPTY 9
-#define W_THREAT 10
-#define B_THREAT 11
-#define PIECE_OTHERS 12
+#define PIECE_UNDEFINED 7
+#define PIECE_EMPTY 8
+#define W_THREAT 9
+#define B_THREAT 10
+#define PIECE_OTHERS 11
 #define COLOR_W 0
 #define COLOR_B 1
 #define COLORS_N 2
@@ -168,7 +167,6 @@ int main(int argc, char *argv[]) {
 	set_piece(all_pieces+WB_KNIGHT, KNIGHT_MOVES_N, knight_moves, 0);
 	set_piece(all_pieces+W_PAWN, PAWN_MOVES_N, w_pawn_moves, 0);
 	set_piece(all_pieces+B_PAWN, PAWN_MOVES_N, b_pawn_moves, 0);
-	set_piece(all_pieces+PIECE_OUTSIDE, 0, NULL, 0);
 	set_piece(all_pieces+PIECE_UNDEFINED, 0, NULL, 0);
 	set_piece(all_pieces+PIECE_EMPTY, 0, NULL, 0);
 	set_piece(all_pieces+W_THREAT, 0, NULL, 0);
@@ -182,7 +180,7 @@ int main(int argc, char *argv[]) {
 		return EXIT_FAILURE;
 	}
 	for (i = 0; i < MEM_OFFSET; ++i) {
-		set_row(i, all_pieces+PIECE_OUTSIDE, 0UL);
+		set_row(i, all_pieces+PIECE_OTHERS, 0UL);
 	}
 	others_max = OTHERS_MAX;
 	if ((options & PAWNS_FIRST_ROW) == PAWNS_FIRST_ROW) {
@@ -197,7 +195,7 @@ int main(int argc, char *argv[]) {
 	}
 	set_row(MEM_OFFSET+rows_n-1, all_pieces+PIECE_UNDEFINED, others_max);
 	for (i = MEM_OFFSET+rows_n; i < mem_rows_n; ++i) {
-		set_row(i, all_pieces+PIECE_OUTSIDE, 0UL);
+		set_row(i, all_pieces+PIECE_OTHERS, 0UL);
 	}
 	squares_n = rows_n*columns_n;
 	squares = malloc(sizeof(square_t *)*(size_t)squares_n);
@@ -421,7 +419,7 @@ static void set_row(int row, piece_t *piece, unsigned long others_max) {
 static void set_side(int row, int column_a, int column_b) {
 	int i;
 	for (i = column_a; i < column_b; ++i) {
-		set_square(mem_squares+square_idx(row, i), row, i, square_idx(row, i), all_pieces+PIECE_OUTSIDE, 0UL);
+		set_square(mem_squares+square_idx(row, i), row, i, square_idx(row, i), all_pieces+PIECE_OTHERS, 0UL);
 	}
 }
 
