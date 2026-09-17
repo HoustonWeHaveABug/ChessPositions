@@ -336,11 +336,11 @@ def set_cache(w_square, b_square)
 end
 
 usage unless ARGV.size == 3 && ARGV[0].integer? && ARGV[1].integer? && ARGV[2].integer?
-@rows = ARGV[0].to_i
+rows = ARGV[0].to_i
 @columns = ARGV[1].to_i
 @options = ARGV[2].to_i
-usage unless @rows > 1 && @columns.positive? && @options >= 0 && @options < 8
-@mem_rows = @rows + 4
+usage unless rows > 1 && @columns.positive? && @options >= 0 && @options < 8
+mem_rows = rows + 4
 @mem_columns = @columns + 4
 @moves = [
   0,
@@ -383,31 +383,31 @@ others_max = 9
 others_max += 1 if @options & 1 == 1
 others_max += 1 if @options & 2 == 2
 set_row(2, @pieces['?'], others_max)
-(3..@rows).each do |row|
+(3..rows).each do |row|
   set_row(row, @pieces['?'], 11)
 end
-set_row(@rows + 1, @pieces['?'], others_max)
-(@rows + 2..@mem_rows - 1).each do |row|
+set_row(rows + 1, @pieces['?'], others_max)
+(rows + 2..mem_rows - 1).each do |row|
   set_row(row, @pieces['*'], 0)
 end
 @squares = []
-(2..@rows + 1).each do |row|
+(2..rows + 1).each do |row|
   (2..@columns + 1).each do |column|
     @squares.push(@mem_squares[square_idx(row, column)])
   end
 end
 @squares.each do |square|
   square.h_mirror = @mem_squares[square_idx(square.row, @mem_columns - square.column - 1)]
-  square.v_mirror = @mem_squares[square_idx(@mem_rows - square.row - 1, square.column)]
-  square.opposite = @mem_squares[square_idx(@mem_rows - square.row - 1, @mem_columns - square.column - 1)]
+  square.v_mirror = @mem_squares[square_idx(mem_rows - square.row - 1, square.column)]
+  square.opposite = @mem_squares[square_idx(mem_rows - square.row - 1, @mem_columns - square.column - 1)]
 end
 @colors = [
   ChessColor.new(%w[Qq Rr Bb Nn], @pieces['P'], @pieces['t']),
   ChessColor.new(%w[Qq Rr Bb Nn], @pieces['p'], @pieces['T'])
 ]
 @threats = []
-@cache = Array.new(@mem_rows * @mem_columns) do
-  Array.new(@mem_rows * @mem_columns, 0)
+@cache = Array.new(mem_rows * @mem_columns) do
+  Array.new(mem_rows * @mem_columns, 0)
 end
 @squares.each do |w_square|
   set_king_square(w_square, @pieces['Kk'], @colors[0])
@@ -417,7 +417,7 @@ end
     set_king_square(b_square, @pieces['Kk'], @colors[1])
     @squares.each(&:reset_states)
     set_color_states(w_square, 0, 3)
-    set_color_states(b_square, 1, @rows)
+    set_color_states(b_square, 1, rows)
     set_threats
     @threats_size = @threats.size
     search_positions(0, 1)
